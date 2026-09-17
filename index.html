@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settima Mecatrônica</title>
+<meta name="description" content="Novos produtos e modelos operacionais para a indústria.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@500;600&display=swap">
+<style>
+  /* Paleta herdada do painel anti-colisão da própria casa. */
+  :root {
+    --paper: #EDF0E7;
+    --paper-raised: #E2E7D9;
+    --card-bg: #F6F8F2;
+    --ink: #1E2118;
+    --ink-soft: #565C4B;
+    --ink-faint: #7C8271;
+    --steel: #33525E;
+    --steel-soft: #6C8891;
+    --accent: #BE4E17;
+    --critical: #963528;
+    --line: #C7CDB9;
+    --line-strong: #A8AF97;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14180F;
+      --paper-raised: #1C2116;
+      --card-bg: #191E14;
+      --ink: #E9EDE0;
+      --ink-soft: #AFB79F;
+      --ink-faint: #868E76;
+      --steel: #8FB3C0;
+      --steel-soft: #5F7F8B;
+      --accent: #E4763C;
+      --critical: #D9614F;
+      --line: #2E3626;
+      --line-strong: #414B36;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #14180F;
+    --paper-raised: #1C2116;
+    --card-bg: #191E14;
+    --ink: #E9EDE0;
+    --ink-soft: #AFB79F;
+    --ink-faint: #868E76;
+    --steel: #8FB3C0;
+    --steel-soft: #5F7F8B;
+    --accent: #E4763C;
+    --critical: #D9614F;
+    --line: #2E3626;
+    --line-strong: #414B36;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 16px/1.55 "IBM Plex Mono", ui-monospace, monospace;
+    padding-block: 28px 48px;
+    padding-inline: 20px;
+  }
+  main { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; }
+
+  header { display: flex; flex-direction: column; gap: 10px; }
+  .marca {
+    font-family: "Oswald", system-ui, sans-serif; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .06em;
+    font-size: clamp(1.9rem, 6vw, 3rem); line-height: 1; color: var(--ink);
+  }
+  .tagline {
+    font-family: "Oswald", system-ui, sans-serif; font-weight: 500;
+    font-size: clamp(1rem, 2.6vw, 1.35rem); letter-spacing: .02em;
+    color: var(--steel); text-wrap: balance; margin: 0;
+  }
+  .cnpj { font-size: .78rem; color: var(--ink-faint); letter-spacing: .04em; }
+
+  .cena {
+    background: var(--card-bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 10px 4px;
+  }
+  .cena figcaption {
+    font-size: .8rem; color: var(--ink-faint);
+    padding: 8px 6px 10px; text-wrap: pretty;
+  }
+  .cena figcaption b { color: var(--accent); font-weight: 500; }
+
+  /* --- a cena: regras portadas do painel anti-colisão --- */
+  .diagram-svg { width: 100%; height: auto; display: block; }
+  .diagram-svg text { font-family: "IBM Plex Mono", monospace; }
+  .diagram-svg .ground { stroke: var(--line-strong); stroke-width: 1.5; stroke-dasharray: 5 5; }
+  .diagram-svg .structure { stroke: var(--steel); fill: none; stroke-linecap: round; }
+  .diagram-svg .joint { fill: var(--paper-raised); stroke: var(--steel); stroke-width: 2; }
+  .diagram-svg .footing { fill: var(--paper-raised); stroke: var(--line-strong); stroke-width: 1.5; }
+  .diagram-svg .protractor-arc { stroke: var(--steel-soft); stroke-width: 1.2; fill: none; }
+  .diagram-svg .protractor-ref { stroke: var(--steel); stroke-width: 1.2; stroke-dasharray: 2 3; }
+  .diagram-svg .protractor-label { font-size: 9px; fill: var(--ink-faint); }
+  .diagram-svg .protractor-axis { font-size: 11px; font-weight: 600; fill: var(--steel); }
+  #live-svg .grid-linha { stroke: var(--line); stroke-width: 1; opacity: .5; }
+  #live-svg .live-ceil { stroke: var(--critical); stroke-width: 2; }
+  #live-svg .live-ceil-label { font-size: 13px; fill: var(--critical); }
+  #live-svg .live-limit { stroke: var(--accent); stroke-width: 2; }
+  #live-svg .live-limit-label { font-size: 13px; fill: var(--accent); }
+  #live-svg .live-mark-line { stroke: var(--accent); stroke-width: 1; }
+  #live-svg .live-readout { font-size: 16px; fill: var(--ink); font-weight: 500; }
+  #live-svg .live-model-label {
+    font-family: "Oswald", sans-serif; font-weight: 600; text-transform: uppercase;
+    font-size: 24px; letter-spacing: .03em; fill: var(--ink-soft);
+  }
+  #live-svg .live-dim-label { font-size: 11.5px; fill: var(--steel); font-weight: 500; }
+
+  .texto p { margin: 0 0 14px; max-width: 62ch; }
+  .texto p:last-child { margin-bottom: 0; }
+
+  .portas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .porta {
+    display: flex; flex-direction: column; gap: 6px;
+    background: var(--card-bg); border: 1px solid var(--line);
+    border-left: 3px solid var(--steel);
+    border-radius: 3px; padding: 16px 18px;
+    color: inherit; text-decoration: none;
+  }
+  .porta:hover, .porta:focus-visible { border-left-color: var(--accent); background: var(--paper-raised); }
+  .porta:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .porta .rot {
+    font-family: "Oswald", sans-serif; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .05em; font-size: .95rem;
+  }
+  .porta .sub { font-size: .85rem; color: var(--ink-faint); }
+
+  footer {
+    border-top: 1px solid var(--line); padding-top: 16px;
+    font-size: .8rem; color: var(--ink-faint);
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+  }
+  footer a { color: var(--steel); }
+  @media (prefers-reduced-motion: reduce) { .diagram-svg { --pausar: 1; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="marca">Settima</div>
+    <p class="tagline">Novos produtos e modelos operacionais para a indústria</p>
+    <div class="cnpj">Settima Mecatrônica Ind. e Com. de Prod. El. Ltda · São Paulo</div>
+  </header>
+
+  <figure class="cena">
+    <svg id="live-svg" class="diagram-svg" viewBox="0 120 500 480" xmlns="http://www.w3.org/2000/svg"
+         role="img" aria-label="Animação do braço e da lança de uma grua florestal varrendo o limite de alarme, com o ponto limitante destacado">
+      <defs>
+        <pattern id="grid" width="25" height="25" patternUnits="userSpaceOnUse">
+          <path class="grid-linha" d="M25 0 L0 0 0 25" fill="none"/>
+        </pattern>
+      </defs>
+      <rect x="0" y="-30" width="500" height="680" fill="url(#grid)"/>
+      <line id="live-ground" class="ground" x1="16" x2="484"/>
+      <line id="live-ceil" class="live-ceil" x1="16" x2="484"/>
+      <text id="live-ceil-label" class="live-ceil-label" x="16">TETO</text>
+      <line id="live-limit" class="live-limit" x1="16" x2="484" stroke-dasharray="9 7"/>
+      <text id="live-limit-label" class="live-limit-label" x="16">LIMITE DE ALARME</text>
+      <rect id="live-column" class="footing" x="423" width="54"/>
+
+      <line id="live-t1-ref" class="protractor-ref"/>
+      <polyline id="live-t1-arc" class="protractor-arc"/>
+      <text id="live-t1-lbl0" class="protractor-label" text-anchor="end">0°</text>
+      <text id="live-t1-lbl30" class="protractor-label" text-anchor="end">30°</text>
+      <text id="live-t1-lbl60" class="protractor-label" text-anchor="middle">60°</text>
+      <text id="live-t1-lbl90" class="protractor-label" text-anchor="middle">90°</text>
+      <text id="live-t1-axis" class="protractor-axis" text-anchor="middle">θ1</text>
+
+      <line id="live-t2-ref" class="protractor-ref"/>
+      <polyline id="live-t2-arc" class="protractor-arc"/>
+      <text id="live-t2-lbl0" class="protractor-label" text-anchor="middle">0°</text>
+      <text id="live-t2-lbl90" class="protractor-label" text-anchor="middle">90°</text>
+      <text id="live-t2-lbl180" class="protractor-label" text-anchor="middle">180°</text>
+      <text id="live-t2-axis" class="protractor-axis" text-anchor="middle">θ2</text>
+
+      <line id="live-boom" class="structure" stroke-width="15"/>
+      <line id="live-arm" class="structure" stroke-width="11"/>
+      <circle id="live-joint-pivot" class="joint" r="14"/>
+      <circle id="live-joint-elbow" class="joint" r="11"/>
+      <circle id="live-joint-wrist" class="joint" r="9"/>
+      <circle id="live-mark-elbow" r="6"/>
+      <circle id="live-mark-wrist" r="6"/>
+      <line id="live-mark-line" class="live-mark-line"/>
+
+      <rect x="4" y="134" width="220" height="32" fill="var(--card-bg)"/>
+      <text id="live-model-label" class="live-model-label" x="16" y="156" text-anchor="start">HFORT 8800LI</text>
+
+      <text id="live-dim-col" class="live-dim-label" text-anchor="middle"></text>
+      <text id="live-dim-boom" class="live-dim-label" text-anchor="end"></text>
+      <text id="live-dim-arm" class="live-dim-label" text-anchor="middle"></text>
+
+      <rect x="230" y="154" width="254" height="32" fill="var(--card-bg)"/>
+      <text id="live-readout" class="live-readout" x="484" y="176" text-anchor="end"></text>
+    </svg>
+    <figcaption>
+      Anti-colisão do HFORT 4.0: a cada posição da lança, o sistema calcula qual ponto chega
+      primeiro ao limite — <b>o cotovelo ou a ponta</b> — e é esse que dispara o alarme antes
+      do teto. Aqui, um 8800LI varrendo o limite com teto de 6,0 m e margem de 1,0 m.
+    </figcaption>
+  </figure>
+
+  <section class="texto">
+    <p>Projetamos e fabricamos eletrônica embarcada, sensores e sistemas de controle para
+    quem opera máquina pesada e infraestrutura predial — do nó que mede a pressão hidráulica
+    ao painel que mostra a máquina inteira, em tempo real.</p>
+    <p>Trabalhamos da placa ao processo: o que muda numa instalação não é só o equipamento
+    novo, é o modo de operar que ele torna possível.</p>
+  </section>
+
+  <nav class="portas">
+    <a class="porta" href="https://m33600.github.io/hfort-dashboard/anticolisao-mobile.html">
+      <span class="rot">Simulação completa</span>
+      <span class="sub">Ajuste teto, margem e modelo da grua e veja o limite recalcular ao vivo.</span>
+    </a>
+    <a class="porta" href="https://sites.google.com/a/settima.com.br/settima-public/Home">
+      <span class="rot">Acervo técnico</span>
+      <span class="sub">Circuitaria, esquemas elétricos, centrais de chamada, telefonia e bibliografia.</span>
+    </a>
+  </nav>
+
+  <footer>
+    <span>Settima Mecatrônica · CNPJ 07.029.386/0001-03</span>
+    <span><a href="mailto:masetti@settima.com.br">masetti@settima.com.br</a></span>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var MODELO = { name: '8800LI', L0: 1.77, L1: 3.975, L2: 2.795 };
+  var TETO = 6.0, MARGEM = 1.0;
+  var ALCANCE_MAX = MODELO.L0 + MODELO.L1 + MODELO.L2;
+
+  var live = {
+    teto: TETO, margem: MARGEM, limite: TETO - MARGEM,
+    scale: 60, groundY: 560, pivotX: 450,
+    L0: MODELO.L0, L1: MODELO.L1, L2: MODELO.L2
+  };
+
+  function hElbow(t1deg, l0, l1) { return l0 + l1 * Math.sin(t1deg * Math.PI / 180); }
+  function hTip(t1deg, t2deg, l0, l1, l2) {
+    var t1 = t1deg * Math.PI / 180, t2 = t2deg * Math.PI / 180;
+    return l0 + l1 * Math.sin(t1) + l2 * Math.sin(t1 - t2);
+  }
+  function hMax(t1deg, t2deg, l0, l1, l2) {
+    return Math.max(hElbow(t1deg, l0, l1), hTip(t1deg, t2deg, l0, l1, l2));
+  }
+  /* Menor ângulo do braço em que a máquina toca o limite, dada a lança. Busca binária:
+     é o mesmo cálculo que roda no gateway da grua. */
+  function theta1Crit(t2deg, limite, l0, l1, l2) {
+    if (hElbow(0, l0, l1) >= limite) return 0;
+    if (hMax(90, t2deg, l0, l1, l2) < limite) return 90;
+    var lo = 0, hi = 90;
+    for (var i = 0; i < 50; i++) {
+      var mid = (lo + hi) / 2;
+      if (hMax(mid, t2deg, l0, l1, l2) < limite) lo = mid; else hi = mid;
+    }
+    return hi;
+  }
+  function fmt1(n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+  function fmt2(n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmt3(n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }); }
+
+  function el(id) { return document.getElementById(id); }
+  function arcPts(center, u, v, r, fromDeg, toDeg, step) {
+    var pts = [];
+    for (var d = fromDeg; d <= toDeg + 0.01; d += step) {
+      var rad = d * Math.PI / 180;
+      pts.push((center[0] + r * (Math.cos(rad) * u[0] + Math.sin(rad) * v[0])).toFixed(1) + ',' +
+               (center[1] + r * (Math.cos(rad) * u[1] + Math.sin(rad) * v[1])).toFixed(1));
+    }
+    return pts.join(' ');
+  }
+  function ptAt(center, u, v, r, deg) {
+    var rad = deg * Math.PI / 180;
+    return [center[0] + r * (Math.cos(rad) * u[0] + Math.sin(rad) * v[0]),
+            center[1] + r * (Math.cos(rad) * u[1] + Math.sin(rad) * v[1])];
+  }
+  function setText(id, pt) { el(id).setAttribute('x', pt[0].toFixed(1)); el(id).setAttribute('y', pt[1].toFixed(1)); }
+  function setCircle(id, pt) { el(id).setAttribute('cx', pt[0]); el(id).setAttribute('cy', pt[1]); }
+
+  function layoutLive() {
+    var available = live.groundY - 30;
+    live.scale = (available / (ALCANCE_MAX * 1.15)) * 1.1;
+
+    var ceilY = live.groundY - live.teto * live.scale;
+    var limitY = live.groundY - live.limite * live.scale;
+    var colTopY = live.groundY - live.L0 * live.scale;
+
+    el('live-ground').setAttribute('y1', live.groundY);
+    el('live-ground').setAttribute('y2', live.groundY);
+    el('live-ceil').setAttribute('y1', ceilY);
+    el('live-ceil').setAttribute('y2', ceilY);
+    var ceilLbl = el('live-ceil-label');
+    ceilLbl.setAttribute('y', ceilY - 8);
+    ceilLbl.textContent = 'TETO ' + fmt1(live.teto) + ' m';
+
+    el('live-limit').setAttribute('y1', limitY);
+    el('live-limit').setAttribute('y2', limitY);
+    var limLbl = el('live-limit-label');
+    limLbl.setAttribute('y', limitY + 18);
+    limLbl.textContent = 'LIMITE DE ALARME ' + fmt1(live.limite) + ' m';
+
+    var col = el('live-column');
+    col.setAttribute('y', colTopY);
+    col.setAttribute('height', live.groundY - colTopY);
+    live.pivot = [live.pivotX, colTopY];
+
+    var pivot = live.pivot, uh = [-1, 0], vh = [0, -1];
+    var rArc1 = 0.85 * live.scale, rLbl1 = 1.12 * live.scale;
+    el('live-t1-ref').setAttribute('x1', pivot[0]);
+    el('live-t1-ref').setAttribute('y1', pivot[1]);
+    var refEnd1 = ptAt(pivot, uh, vh, rLbl1 * 1.05, 0);
+    el('live-t1-ref').setAttribute('x2', refEnd1[0]);
+    el('live-t1-ref').setAttribute('y2', refEnd1[1]);
+    el('live-t1-arc').setAttribute('points', arcPts(pivot, uh, vh, rArc1, 0, 90, 5));
+    setText('live-t1-lbl0', ptAt(pivot, uh, vh, rLbl1, 0));
+    setText('live-t1-lbl30', ptAt(pivot, uh, vh, rLbl1, 30));
+    setText('live-t1-lbl60', ptAt(pivot, uh, vh, rLbl1, 60));
+    setText('live-t1-lbl90', ptAt(pivot, uh, vh, rLbl1, 90));
+    setText('live-t1-axis', ptAt(pivot, uh, vh, rArc1 * 0.8, 45));
+
+    /* à esquerda da coluna: à direita o texto vaza para fora do viewBox */
+    var colMid = [pivot[0], (pivot[1] + live.groundY) / 2];
+    var dimCol = el('live-dim-col');
+    dimCol.setAttribute('x', colMid[0] - 46);
+    dimCol.setAttribute('y', colMid[1]);
+    dimCol.setAttribute('text-anchor', 'end');
+    dimCol.textContent = 'coluna ' + fmt2(live.L0) + ' m';
+  }
+
+  function drawLivePose(t2deg) {
+    var t1deg = theta1Crit(t2deg, live.limite, live.L0, live.L1, live.L2);
+    var t1 = t1deg * Math.PI / 180, t2 = t2deg * Math.PI / 180;
+    var pivot = live.pivot;
+    var u = [-Math.cos(t1), -Math.sin(t1)];
+    var v = [-Math.sin(t1), Math.cos(t1)];
+    var elbow = [pivot[0] + live.L1 * live.scale * u[0], pivot[1] + live.L1 * live.scale * u[1]];
+    var ldir = [Math.cos(t2) * u[0] + Math.sin(t2) * v[0], Math.cos(t2) * u[1] + Math.sin(t2) * v[1]];
+    var wrist = [elbow[0] + live.L2 * live.scale * ldir[0], elbow[1] + live.L2 * live.scale * ldir[1]];
+
+    var boom = el('live-boom');
+    boom.setAttribute('x1', pivot[0]); boom.setAttribute('y1', pivot[1]);
+    boom.setAttribute('x2', elbow[0]); boom.setAttribute('y2', elbow[1]);
+    var arm = el('live-arm');
+    arm.setAttribute('x1', elbow[0]); arm.setAttribute('y1', elbow[1]);
+    arm.setAttribute('x2', wrist[0]); arm.setAttribute('y2', wrist[1]);
+
+    setCircle('live-joint-pivot', pivot);
+    setCircle('live-joint-elbow', elbow);
+    setCircle('live-joint-wrist', wrist);
+
+    /* quem chega primeiro ao limite: é o que o alarme vigia */
+    var he = hElbow(t1deg, live.L0, live.L1);
+    var ht = hTip(t1deg, t2deg, live.L0, live.L1, live.L2);
+    var binding = he >= ht - 0.01 ? 'cotovelo' : 'ponta';
+    setCircle('live-mark-elbow', elbow);
+    setCircle('live-mark-wrist', wrist);
+    el('live-mark-elbow').style.fill = binding === 'cotovelo' ? 'var(--accent)' : 'var(--steel-soft)';
+    el('live-mark-wrist').style.fill = binding === 'ponta' ? 'var(--accent)' : 'var(--steel-soft)';
+    var limitY = live.groundY - live.limite * live.scale;
+    var bindPt = binding === 'cotovelo' ? elbow : wrist;
+    var markLine = el('live-mark-line');
+    markLine.setAttribute('x1', bindPt[0]); markLine.setAttribute('x2', bindPt[0]);
+    markLine.setAttribute('y1', bindPt[1]); markLine.setAttribute('y2', limitY);
+
+    el('live-readout').textContent =
+      'θ1=' + fmt1(t1deg) + '°  θ2=' + fmt1(t2deg) + '°  ·  limitante: ' + binding;
+
+    var rArc2 = 0.6 * live.scale, rLbl2 = 0.8 * live.scale;
+    el('live-t2-ref').setAttribute('x1', elbow[0]);
+    el('live-t2-ref').setAttribute('y1', elbow[1]);
+    var refEnd2 = ptAt(elbow, u, v, rLbl2 * 1.05, 0);
+    el('live-t2-ref').setAttribute('x2', refEnd2[0]);
+    el('live-t2-ref').setAttribute('y2', refEnd2[1]);
+    el('live-t2-arc').setAttribute('points', arcPts(elbow, u, v, rArc2, 0, 180, 5));
+    setText('live-t2-lbl0', ptAt(elbow, u, v, rLbl2, 0));
+    setText('live-t2-lbl90', ptAt(elbow, u, v, rLbl2, 90));
+    setText('live-t2-lbl180', ptAt(elbow, u, v, rLbl2, 180));
+    setText('live-t2-axis', ptAt(elbow, u, v, rArc2 * 0.75, 45));
+
+    var boomMid = [(pivot[0] + elbow[0]) / 2, (pivot[1] + elbow[1]) / 2];
+    var boomDir = [elbow[0] - pivot[0], elbow[1] - pivot[1]];
+    var boomLen = Math.hypot(boomDir[0], boomDir[1]) || 1;
+    var boomPerp = [boomDir[1] / boomLen, -boomDir[0] / boomLen];
+    var dimBoom = el('live-dim-boom');
+    dimBoom.setAttribute('x', boomMid[0] + boomPerp[0] * 22 - 14);
+    dimBoom.setAttribute('y', boomMid[1] + boomPerp[1] * 22);
+    dimBoom.textContent = 'braço ' + fmt3(live.L1) + ' m';
+
+    var armMid = [(elbow[0] + wrist[0]) / 2, (elbow[1] + wrist[1]) / 2];
+    var armDir = [wrist[0] - elbow[0], wrist[1] - elbow[1]];
+    var armLen = Math.hypot(armDir[0], armDir[1]) || 1;
+    var armPerp = [armDir[1] / armLen, -armDir[0] / armLen];
+    var dimArm = el('live-dim-arm');
+    dimArm.setAttribute('x', armMid[0] + armPerp[0] * 20);
+    dimArm.setAttribute('y', armMid[1] + armPerp[1] * 20);
+    dimArm.textContent = 'lança ' + fmt3(live.L2) + ' m';
+  }
+
+  var PERIOD_MS = 9000;
+  function tick(ts) {
+    var phase = (ts % PERIOD_MS) / PERIOD_MS;
+    var tri = phase < 0.5 ? phase * 2 : 2 - phase * 2;
+    drawLivePose(tri * 180);
+    requestAnimationFrame(tick);
+  }
+
+  layoutLive();
+  /* quem pediu menos movimento vê a cena parada numa pose real, não uma caixa vazia */
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    drawLivePose(60);
+  } else {
+    drawLivePose(0);
+    requestAnimationFrame(tick);
+  }
+})();
+</script>
+</body>
+</html>
