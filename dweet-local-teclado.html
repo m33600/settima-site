@@ -131,21 +131,15 @@
   }
   .sair-cheia:hover { opacity: 1; }
 
-  body.tela-cheia { padding: 0; }
+  body.tela-cheia { padding: 20px; }
   body.tela-cheia .marca, body.tela-cheia h1, body.tela-cheia .sub,
   body.tela-cheia .estado, body.tela-cheia .aviso, body.tela-cheia .rodape { display: none; }
   body.tela-cheia .sair-cheia { display: block; }
-  body.tela-cheia main { max-width: none; }
-  body.tela-cheia .botoes {
-    position: fixed; inset: 0; margin: 0; gap: 2px;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, 1fr);
+  body.tela-cheia main {
+    max-width: none; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
   }
-  body.tela-cheia button {
-    min-height: 0; border-radius: 0; font-size: clamp(1.4rem, 6vw, 3rem);
-  }
-  body.tela-cheia button .tecla { font-size: 1.2rem; top: 16px; right: 20px; }
-  body.tela-cheia .sair-cheia { top: 6px; right: 6px; font-size: .68rem; padding: 4px 8px; }
+  body.tela-cheia .botoes { width: 100%; max-width: 480px; }
 </style>
 </head>
 <body>
