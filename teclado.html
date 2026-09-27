@@ -52,10 +52,8 @@
     padding: 24px 16px 40px;
   }
   main { max-width: 480px; margin: 0 auto; }
-  .marca {
-    font-family: "Oswald", sans-serif; font-weight: 600; text-transform: uppercase;
-    letter-spacing: .05em; font-size: .85rem; color: var(--steel); margin-bottom: 4px;
-  }
+  .marca { margin-bottom: 8px; }
+  .marca img { display: block; height: 20px; width: auto; }
   h1 {
     font-family: "Oswald", sans-serif; font-weight: 600; letter-spacing: -.01em;
     font-size: 1.35rem; margin: 0 0 4px;
@@ -118,11 +116,42 @@
   .ponto.falha { background: var(--vermelho); }
 
   .sem-coisa { background: var(--card-bg); border: 1px solid var(--line); border-radius: 4px; padding: 18px; }
+
+  .botao-cheia {
+    font: inherit; font-size: .78rem; color: var(--ink-faint);
+    background: var(--paper); border: 1px solid var(--line); border-radius: 4px;
+    padding: 5px 10px; cursor: pointer; margin-top: 10px;
+  }
+  .botao-cheia:hover { color: var(--ink); }
+  .sair-cheia {
+    display: none; position: fixed; top: 10px; right: 10px; z-index: 20;
+    font: inherit; font-size: .74rem; color: var(--ink-faint);
+    background: var(--card-bg); border: 1px solid var(--line); border-radius: 4px;
+    padding: 6px 12px; cursor: pointer; opacity: .45; transition: opacity .15s;
+  }
+  .sair-cheia:hover { opacity: 1; }
+
+  body.tela-cheia { padding: 0; }
+  body.tela-cheia .marca, body.tela-cheia h1, body.tela-cheia .sub,
+  body.tela-cheia .estado, body.tela-cheia .aviso, body.tela-cheia .rodape { display: none; }
+  body.tela-cheia .sair-cheia { display: block; }
+  body.tela-cheia main { max-width: none; }
+  body.tela-cheia .botoes {
+    position: fixed; inset: 0; margin: 0; gap: 2px;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+  }
+  body.tela-cheia button {
+    min-height: 0; border-radius: 0; font-size: clamp(1.4rem, 6vw, 3rem);
+  }
+  body.tela-cheia button .tecla { font-size: 1.2rem; top: 16px; right: 20px; }
+  body.tela-cheia .sair-cheia { top: 6px; right: 6px; font-size: .68rem; padding: 4px 8px; }
 </style>
 </head>
 <body>
 <main>
-  <div class="marca">Settima</div>
+  <button id="sair-cheia" class="sair-cheia" type="button">✕ Sair da tela cheia</button>
+  <div class="marca"><img src="img/settima-logo-transparente.png" alt="Settima"></div>
   <h1 id="titulo">Teclado do posto</h1>
   <p class="sub">Teclado público ligado só ao <a href="index.html" style="color:var(--steel)">painel da homepage</a> — não aciona nada na fábrica.</p>
 
@@ -148,6 +177,7 @@
     <div class="rodape">
       <p>Quem também estiver com o painel ou este link abertos vê a cor mudar em poucos segundos.</p>
       <p><span class="ponto" id="ponto"></span><span id="conexao">conectando ao dweet.cc…</span></p>
+      <button id="btn-cheia" class="botao-cheia" type="button">⛶ Tela cheia (só as teclas)</button>
     </div>
   </section>
 
@@ -279,6 +309,29 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden && coisa) ler(); });
   window.addEventListener('hashchange', iniciar);
   iniciar();
+
+  // Tela cheia: só as teclas, para um tablet fixado na parede.
+  function aplicarTelaCheia(ligar) {
+    document.body.classList.toggle('tela-cheia', ligar);
+    const url = new URL(location.href);
+    if (ligar) url.searchParams.set('cheia', '1'); else url.searchParams.delete('cheia');
+    history.replaceState(null, '', url);
+  }
+  $('btn-cheia')?.addEventListener('click', () => {
+    aplicarTelaCheia(true);
+    document.documentElement.requestFullscreen?.().catch(() => {});
+  });
+  $('sair-cheia').addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen?.();
+    aplicarTelaCheia(false);
+  });
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) aplicarTelaCheia(false);
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && document.body.classList.contains('tela-cheia')) aplicarTelaCheia(false);
+  });
+  if (new URLSearchParams(location.search).has('cheia')) aplicarTelaCheia(true);
 })();
 </script>
 </body>
