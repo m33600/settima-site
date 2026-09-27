@@ -79,6 +79,7 @@
   main { max-width: 880px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px; }
 
   header { display: flex; flex-direction: column; gap: 10px; }
+  .marca-linha { display: flex; align-items: center; flex-wrap: wrap; gap: 12px 18px; }
   .marca { width: fit-content; }
   .marca img {
     display: block;
@@ -87,7 +88,7 @@
   }
   .tagline {
     font-family: "Oswald", system-ui, sans-serif; font-weight: 500;
-    font-size: clamp(1rem, 2.6vw, 1.35rem); letter-spacing: .02em;
+    font-size: clamp(.8rem, 1.6vw, .95rem); letter-spacing: .02em;
     color: var(--steel); text-wrap: balance; margin: 0;
   }
   .cnpj { font-size: .78rem; color: var(--ink-faint); letter-spacing: .04em; }
@@ -208,8 +209,10 @@
 <body>
 <main>
   <header>
-    <div class="marca"><img src="img/settima-logo-transparente.png" alt="Settima"></div>
-    <p class="tagline">Novos produtos e modelos operacionais para a indústria</p>
+    <div class="marca-linha">
+      <div class="marca"><img src="img/settima-logo-transparente.png" alt="Settima"></div>
+      <p class="tagline">Novos produtos e modelos operacionais para a indústria</p>
+    </div>
     <div class="cnpj">São Paulo, Brasil</div>
   </header>
 
