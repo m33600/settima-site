@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Teclado do posto — dweet-local</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@500;600&display=swap">
+<style>
+  :root {
+    --paper: #EDF0E7;
+    --paper-raised: #E2E7D9;
+    --card-bg: #F6F8F2;
+    --ink: #1E2118;
+    --ink-soft: #565C4B;
+    --ink-faint: #7C8271;
+    --steel: #33525E;
+    --accent: #BE4E17;
+    --line: #C7CDB9;
+    --verde: #1f9d55;
+    --amarelo: #b9840a;
+    --vermelho: #ba3a2f;
+    --apagada: #9099a3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14180F;
+      --paper-raised: #1C2116;
+      --card-bg: #191E14;
+      --ink: #E9EDE0;
+      --ink-soft: #AFB79F;
+      --ink-faint: #868E76;
+      --steel: #8FB3C0;
+      --accent: #E4763C;
+      --line: #2E3626;
+      --verde: #3fc47c;
+      --amarelo: #e0ab2c;
+      --vermelho: #e2685c;
+      --apagada: #5b6169;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 16px/1.5 "IBM Plex Mono", ui-monospace, monospace;
+    padding: 24px 16px 40px;
+  }
+  main { max-width: 480px; margin: 0 auto; }
+  .marca {
+    font-family: "Oswald", sans-serif; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .05em; font-size: .85rem; color: var(--steel); margin-bottom: 4px;
+  }
+  h1 {
+    font-family: "Oswald", sans-serif; font-weight: 600; letter-spacing: -.01em;
+    font-size: 1.35rem; margin: 0 0 4px;
+  }
+  .sub { color: var(--ink-faint); margin: 0 0 20px; font-size: .92rem; }
+
+  .estado {
+    border-radius: 4px; padding: 18px 18px;
+    background: var(--card-bg); border: 1px solid var(--line);
+    border-left: 3px solid var(--steel);
+    display: flex; align-items: center; gap: 16px; margin-bottom: 18px;
+  }
+  .lampada {
+    width: 56px; height: 56px; flex: none; border-radius: 50%;
+    background: var(--apagada);
+    transition: background .2s, box-shadow .2s;
+  }
+  .lampada.acesa { box-shadow: 0 0 24px 4px var(--brilho, transparent); }
+  .textos { min-width: 0; }
+  .rotulo-campo { font-size: .8rem; color: var(--ink-faint); }
+  .atual {
+    font-family: "Oswald", sans-serif; font-weight: 600;
+    font-size: 1.4rem; line-height: 1.2;
+  }
+  .detalhe { font-size: .85rem; color: var(--ink-faint); margin-top: 4px; }
+  .detalhe.ok { color: var(--verde); }
+
+  .botoes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  button {
+    appearance: none; border: 0; border-radius: 4px;
+    min-height: 84px; padding: 10px; color: #fff;
+    font: inherit; font-size: 1.05rem; font-weight: 600; cursor: pointer;
+    position: relative; transition: filter .15s, outline-color .15s;
+    outline: 3px solid transparent; outline-offset: 3px;
+  }
+  button:hover { filter: brightness(1.07); }
+  button:active { transform: scale(.98); }
+  button:focus-visible { outline-color: var(--ink); }
+  button[aria-pressed="true"] { outline-color: var(--ink); }
+  button:disabled { cursor: progress; filter: saturate(.6) brightness(.95); }
+  button .tecla { position: absolute; top: 8px; right: 10px; font-size: .7rem; opacity: .8; }
+  .b1 { background: var(--verde); }
+  .b2 { background: var(--amarelo); }
+  .b3 { background: var(--vermelho); }
+  .b0 { background: var(--apagada); }
+
+  @media (min-width: 420px) { .botoes { grid-template-columns: repeat(4, 1fr); } }
+
+  .aviso { min-height: 1.4em; margin: 16px 2px 0; font-size: .92rem; }
+  .aviso.erro { color: var(--vermelho); }
+  .aviso.ok { color: var(--verde); }
+
+  .rodape {
+    margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line);
+    color: var(--ink-faint); font-size: .82rem;
+  }
+  .rodape p { margin: 0 0 6px; }
+  .ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); margin-right: 6px; }
+  .ponto.ok { background: var(--verde); }
+  .ponto.falha { background: var(--vermelho); }
+
+  .sem-coisa { background: var(--card-bg); border: 1px solid var(--line); border-radius: 4px; padding: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="marca">Settima</div>
+  <h1 id="titulo">Teclado do posto</h1>
+  <p class="sub">Teclado ligado ao <a href="dweet-local-demo.html" style="color:var(--steel)">painel dweet-local</a> — não aciona nada na fábrica.</p>
+
+  <section id="app" hidden>
+    <div class="estado" aria-live="polite">
+      <div class="lampada" id="lampada"></div>
+      <div class="textos">
+        <div class="rotulo-campo">Este posto está</div>
+        <div class="atual" id="atual">lendo…</div>
+        <div class="detalhe" id="detalhe"></div>
+      </div>
+    </div>
+
+    <div class="botoes" role="group" aria-label="Cor do posto">
+      <button class="b1" data-v="1"><span class="tecla">1</span>Verde</button>
+      <button class="b2" data-v="2"><span class="tecla">2</span>Amarelo</button>
+      <button class="b3" data-v="3"><span class="tecla">3</span>Vermelho</button>
+      <button class="b0" data-v="0"><span class="tecla">0</span>Apagar</button>
+    </div>
+
+    <p class="aviso" id="aviso" role="status"></p>
+
+    <div class="rodape">
+      <p>Quem também estiver com o painel ou este link abertos vê a cor mudar em poucos segundos.</p>
+      <p><span class="ponto" id="ponto"></span><span id="conexao">conectando ao servidor…</span></p>
+    </div>
+  </section>
+
+  <section id="sem-coisa" class="sem-coisa" hidden>
+    <strong>Link incompleto</strong>
+    <p class="sub" style="margin:6px 0 0">Abra este teclado a partir de um QR ou link do <a href="dweet-local-demo.html" style="color:var(--steel)">painel</a>.</p>
+  </section>
+</main>
+
+<script>
+(() => {
+  // Toy público: fala só com o dweet-local (nosso clone do dweet.cc, na nuvem
+  // Oracle), para sincronizar com o painel dweet-local-demo.html.
+  // Nenhuma fita, nenhum ESP32, nenhum sistema real do outro lado.
+  const API = 'https://dweet.settima.com.br';
+  const LEITURA_MS = 3000;
+  const CORES = {
+    0: { nome: 'Apagado',  css: 'var(--apagada)' },
+    1: { nome: 'Verde',    css: 'var(--verde)' },
+    2: { nome: 'Amarelo',  css: 'var(--amarelo)' },
+    3: { nome: 'Vermelho', css: 'var(--vermelho)' },
+  };
+  const COISA_VALIDA = /^[A-Za-z0-9_.\-]{6,120}$/;
+
+  const $ = (id) => document.getElementById(id);
+  const botoes = [...document.querySelectorAll('.botoes button')];
+
+  function decodeSeguro(s) { try { return decodeURIComponent(s); } catch { return s; } }
+  function coisaERotuloDoLink() {
+    const bruto = location.hash.slice(1);
+    const pos = bruto.indexOf(':');
+    const coisa = decodeSeguro(pos === -1 ? bruto : bruto.slice(0, pos)).trim();
+    const rotulo = pos === -1 ? '' : decodeSeguro(bruto.slice(pos + 1)).trim();
+    return { coisa, rotulo };
+  }
+
+  let coisa = '';
+  let timer = null;
+  let ultimaLeituraOk = 0;
+  let enviando = false;
+  let atual;   // último valor lido do servidor (undefined = ainda não leu, null = sem status)
+
+  const nomeCor = (s) => (s === null || s === undefined || s < 0) ? 'sem status' : (CORES[s]?.nome ?? `valor ${s}`);
+  const ha = (s) => s < 60 ? `${Math.round(s)} s` : `${Math.round(s / 60)} min`;
+
+  function aviso(texto, tipo = '') {
+    $('aviso').textContent = texto;
+    $('aviso').className = 'aviso ' + tipo;
+  }
+
+  function render() {
+    const info = CORES[atual];
+    const lampada = $('lampada');
+    $('atual').textContent = atual === undefined ? 'lendo…' : nomeCor(atual);
+    lampada.style.background = info ? info.css : '';
+    lampada.style.setProperty('--brilho', info && atual !== 0 ? info.css : 'transparent');
+    lampada.classList.toggle('acesa', !!info && atual !== 0);
+    botoes.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === atual)));
+  }
+
+  const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+
+  async function ler() {
+    try {
+      const r = await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(coisa)}`);
+      const j = await r.json();
+      ultimaLeituraOk = Date.now();
+      if (!enviando) {
+        const s = j.this === 'succeeded' ? parseInt(j.with?.[0]?.content?.status, 10) : NaN;
+        atual = Number.isNaN(s) ? null : s;
+      }
+      $('ponto').className = 'ponto ok';
+      $('conexao').textContent = 'servidor conectado';
+    } catch {
+      const semLeitura = Math.round((Date.now() - (ultimaLeituraOk || Date.now())) / 1000);
+      $('ponto').className = 'ponto falha';
+      $('conexao').textContent = ultimaLeituraOk ? `sem resposta do servidor há ${ha(semLeitura)}` : 'sem contato com o servidor';
+    }
+    render();
+  }
+
+  async function gravar(v) {
+    if (enviando) return;
+    enviando = true;
+    botoes.forEach((b) => (b.disabled = true));
+    aviso('Enviando…');
+    try {
+      const r = await buscar(`${API}/dweet/for/${encodeURIComponent(coisa)}?status=${v}`);
+      const j = await r.json();
+      if (j.this !== 'succeeded') throw new Error(j.because || 'recusado');
+      ultimaLeituraOk = Date.now();
+      atual = v;
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      aviso(`${CORES[v].nome} salvo às ${hora}. Quem estiver com o painel aberto vê em poucos segundos.`, 'ok');
+    } catch (e) {
+      const semContato = e.message === 'Failed to fetch' || e.name === 'TimeoutError';
+      aviso(`Não foi: ${semContato ? 'sem contato com o servidor' : e.message}. Tente de novo.`, 'erro');
+    } finally {
+      enviando = false;
+      botoes.forEach((b) => (b.disabled = false));
+      render();
+    }
+  }
+
+  function iniciar() {
+    const { coisa: c, rotulo } = coisaERotuloDoLink();
+    coisa = c;
+    clearInterval(timer);
+    atual = undefined;
+    if (!COISA_VALIDA.test(coisa)) {
+      $('app').hidden = true;
+      $('sem-coisa').hidden = false;
+      return;
+    }
+    const titulo = rotulo || 'Teclado do posto';
+    document.title = titulo;
+    $('titulo').textContent = titulo;
+    $('sem-coisa').hidden = true;
+    $('app').hidden = false;
+    aviso('');
+    ler();
+    timer = setInterval(() => { if (!document.hidden) ler(); }, LEITURA_MS);
+  }
+
+  botoes.forEach((b) => b.addEventListener('click', () => gravar(Number(b.dataset.v))));
+  document.addEventListener('keydown', (e) => {
+    if ($('app').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (['0', '1', '2', '3'].includes(e.key)) gravar(Number(e.key));
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && coisa) ler(); });
+  window.addEventListener('hashchange', iniciar);
+  iniciar();
+})();
+</script>
+</body>
+</html>
