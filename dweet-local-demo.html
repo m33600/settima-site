@@ -196,6 +196,17 @@
     justify-content: center;
   }
 
+  body.painel-compacto .grade > .posto:nth-child(n+7) { display: flex; }
+  body.painel-compacto .grade { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  body.painel-compacto .posto { padding: 6px 4px; gap: 4px; min-width: 0; overflow: hidden; }
+  body.painel-compacto .topo { flex-direction: column; gap: 4px; }
+  body.painel-compacto .qr, body.painel-compacto .abrir { display: none; }
+  body.painel-compacto .lampada { width: 26px; height: 26px; }
+  body.painel-compacto .nome,
+  body.painel-compacto .estado { text-align: center; overflow-wrap: break-word; word-break: break-word; }
+  body.painel-compacto .nome { font-size: .64rem; }
+  body.painel-compacto .estado { font-size: .58rem; min-height: 1em; }
+
   .modal-qr {
     position: fixed; inset: 0; background: rgba(0, 0, 0, .72);
     display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 10;
@@ -268,6 +279,7 @@
       <span class="ponto" id="ponto"></span>
       <span id="conexao">consultando o servidor…</span>
       <span>· nenhum clique aqui chega à fábrica nem acende uma fita real</span>
+      <button id="btn-compacto" class="botao-cheia" type="button">▦ Painel compacto</button>
       <button id="btn-cheia" class="botao-cheia" type="button">⛶ Tela cheia</button>
     </div>
   </section>
@@ -405,6 +417,20 @@
     if (ev.key === 'Escape' && document.body.classList.contains('tela-cheia')) aplicarTelaCheia(false);
   });
   if (new URLSearchParams(location.search).has('cheia')) aplicarTelaCheia(true);
+
+  // Painel compacto: grade fixa 5x5, pro celular — cabeçalho e rodapé continuam
+  // no lugar (rola normal), só os postos ficam menores e mais densos.
+  function aplicarCompacto(ligar) {
+    document.body.classList.toggle('painel-compacto', ligar);
+    $('btn-compacto').textContent = ligar ? '▦ Sair do painel compacto' : '▦ Painel compacto';
+    const url = new URL(location.href);
+    if (ligar) url.searchParams.set('compacto', '1'); else url.searchParams.delete('compacto');
+    history.replaceState(null, '', url);
+  }
+  $('btn-compacto').addEventListener('click', () => {
+    aplicarCompacto(!document.body.classList.contains('painel-compacto'));
+  });
+  if (new URLSearchParams(location.search).has('compacto')) aplicarCompacto(true);
 
   const nomeCor = (s) => (s === null || s === undefined) ? 'sem status' : (CORES[s]?.nome ?? `valor ${s}`);
   const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
