@@ -23,9 +23,9 @@
     --critical: #963528;
     --line: #C7CDB9;
     --line-strong: #A8AF97;
-    --verde: #1f9d55;
-    --amarelo: #b9840a;
-    --vermelho: #ba3a2f;
+    --verde: #22c55e;
+    --amarelo: #eab308;
+    --vermelho: #ef4444;
     --apagada: #9099a3;
   }
   @media (prefers-color-scheme: dark) {
@@ -42,9 +42,9 @@
       --critical: #D9614F;
       --line: #2E3626;
       --line-strong: #414B36;
-      --verde: #3fc47c;
-      --amarelo: #e0ab2c;
-      --vermelho: #e2685c;
+      --verde: #4ade80;
+      --amarelo: #facc15;
+      --vermelho: #f87171;
       --apagada: #5b6169;
     }
   }
@@ -61,9 +61,9 @@
     --critical: #D9614F;
     --line: #2E3626;
     --line-strong: #414B36;
-    --verde: #3fc47c;
-    --amarelo: #e0ab2c;
-    --vermelho: #e2685c;
+    --verde: #4ade80;
+    --amarelo: #facc15;
+    --vermelho: #f87171;
     --apagada: #5b6169;
   }
 
@@ -197,15 +197,18 @@
   }
 
   body.painel-compacto .grade > .posto:nth-child(n+7) { display: flex; }
-  body.painel-compacto .grade { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  body.painel-compacto .grade { grid-template-columns: repeat(5, 1fr); gap: 6px; order: -1; }
   body.painel-compacto .posto { padding: 6px 4px; gap: 4px; min-width: 0; overflow: hidden; }
   body.painel-compacto .topo { flex-direction: column; gap: 4px; }
   body.painel-compacto .qr, body.painel-compacto .abrir { display: none; }
   body.painel-compacto .lampada { width: 26px; height: 26px; }
   body.painel-compacto .nome,
-  body.painel-compacto .estado { text-align: center; overflow-wrap: break-word; word-break: break-word; }
+  body.painel-compacto .estado { text-align: center; overflow-wrap: break-word; }
   body.painel-compacto .nome { font-size: .64rem; }
   body.painel-compacto .estado { font-size: .58rem; min-height: 1em; }
+  body.painel-compacto header { order: 1; }
+  body.painel-compacto .portas { order: 2; }
+  body.painel-compacto footer { order: 3; }
 
   .modal-qr {
     position: fixed; inset: 0; background: rgba(0, 0, 0, .72);
@@ -426,6 +429,7 @@
     const url = new URL(location.href);
     if (ligar) url.searchParams.set('compacto', '1'); else url.searchParams.delete('compacto');
     history.replaceState(null, '', url);
+    if (grade.children.length) lerTudo();
   }
   $('btn-compacto').addEventListener('click', () => {
     aplicarCompacto(!document.body.classList.contains('painel-compacto'));
@@ -435,13 +439,42 @@
   const nomeCor = (s) => (s === null || s === undefined) ? 'sem status' : (CORES[s]?.nome ?? `valor ${s}`);
   const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
 
+  // O servidor manda "AAAA-MM-DD HH:MM:SS" nas leituras em horário de
+  // Londres (GMT no inverno, BST=+1h no verão britânico) — mesma esquisitice
+  // do dweet.cc original. Sem compensar, a duração saía errada (negativa,
+  // até 1h de diferença conforme a época do ano).
+  function offsetLondresMin() {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', timeZoneName: 'shortOffset' }).formatToParts(new Date());
+    const tz = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+0';
+    const m = tz.match(/GMT([+-]\d+)?/);
+    return m && m[1] ? parseInt(m[1], 10) * 60 : 0;
+  }
+  function dataCriado(bruto) {
+    if (!bruto) return null;
+    const comoUtc = new Date(bruto.replace(' ', 'T') + 'Z');
+    if (Number.isNaN(comoUtc.getTime())) return null;
+    return new Date(comoUtc.getTime() - offsetLondresMin() * 60000);
+  }
+
+  function formatarDuracao(ms) {
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const min = Math.floor(s / 60);
+    if (min < 60) return `${min}min`;
+    const h = Math.floor(min / 60);
+    if (h < 24) { const r = min % 60; return r ? `${h}h${String(r).padStart(2, '0')}` : `${h}h`; }
+    const d = Math.floor(h / 24);
+    const r = h % 24;
+    return r ? `${d}d${r}h` : `${d}d`;
+  }
+
   async function lerPosto(coisa) {
     try {
       const r = await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(coisa)}`);
       const j = await r.json();
-      if (j.this !== 'succeeded') return { ok: true, valor: null };
+      if (j.this !== 'succeeded') return { ok: true, valor: null, criado: null };
       const s = parseInt(j.with?.[0]?.content?.status, 10);
-      return { ok: true, valor: Number.isNaN(s) ? null : s };
+      return { ok: true, valor: Number.isNaN(s) ? null : s, criado: dataCriado(j.with?.[0]?.created) };
     } catch {
       return { ok: false };
     }
@@ -462,8 +495,15 @@
     lampada.style.background = info ? info.css : '';
     lampada.style.setProperty('--brilho', info && r.valor !== 0 ? info.css : 'transparent');
     lampada.classList.toggle('acesa', !!info && r.valor !== 0);
-    estado.textContent = nomeCor(r.valor);
-    estado.classList.toggle('ok', r.valor !== null && r.valor !== 0);
+    const ligado = r.valor !== null && r.valor !== 0;
+    const duracao = (ligado && r.criado) ? formatarDuracao(Date.now() - r.criado.getTime()) : '';
+    const compacto = document.body.classList.contains('painel-compacto');
+    if (compacto) {
+      estado.textContent = r.valor === null ? '---' : (duracao || nomeCor(r.valor));
+    } else {
+      estado.textContent = duracao ? `${nomeCor(r.valor)} · há ${duracao}` : nomeCor(r.valor);
+    }
+    estado.classList.toggle('ok', ligado);
   }
 
   async function lerTudo() {
