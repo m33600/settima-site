@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Painel de fabricação — dweet-local</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@500;600&display=swap">
+<style>
+  :root {
+    --paper: #EDF0E7; --card-bg: #F6F8F2; --ink: #1E2118; --ink-soft: #565C4B; --ink-faint: #7C8271;
+    --steel: #33525E; --accent: #BE4E17; --line: #C7CDB9; --line-strong: #A8AF97;
+    --verde: #22c55e; --vermelho: #ef4444;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14180F; --card-bg: #191E14; --ink: #E9EDE0; --ink-soft: #AFB79F; --ink-faint: #868E76;
+      --steel: #8FB3C0; --accent: #E4763C; --line: #2E3626; --line-strong: #414B36;
+      --verde: #4ade80; --vermelho: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+    font: 400 16px/1.5 "IBM Plex Mono", ui-monospace, monospace; padding: 24px 16px 40px; }
+  main { max-width: 1500px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+  header { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 18px; }
+  .marca-hfort { display: inline-flex; align-items: center; background: #0b0d10; padding: 6px 12px 6px 8px; border-radius: 10px; }
+  .marca-hfort img { display: block; height: clamp(52px, 7vw, 72px); width: auto; }
+  h1 { font-family: "Oswald", sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+    font-size: 1.1rem; margin: 0; }
+  .sub { flex: 1 1 100%; margin: 0; font-size: .85rem; color: var(--ink-faint); max-width: 90ch; }
+  .sub a { color: var(--steel); }
+
+  .grade { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .grua { background: var(--card-bg); border: 1px solid var(--line); border-left: 3px solid var(--steel);
+    border-radius: 4px; padding: 8px 10px 10px; min-width: 0; color: inherit; text-decoration: none;
+    display: flex; flex-direction: column; gap: 6px; }
+  .grua:hover, .grua:focus-visible { border-left-color: var(--accent); }
+  .grua:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .cab { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .nome { font-family: "Oswald", sans-serif; font-weight: 600; letter-spacing: .04em; font-size: 1.05rem; flex: 1; }
+  .idade { font-size: .68rem; color: var(--ink-faint); white-space: nowrap; }
+  .qr { flex: none; width: 34px; height: 34px; padding: 2px; border-radius: 3px; background: #fff; cursor: zoom-in; }
+  .qr svg { display: block; width: 100%; height: 100%; }
+
+  .linha { display: flex; gap: 8px; align-items: baseline; min-height: 1.5em; padding: 1px 4px; border-radius: 2px; min-width: 0; }
+  .linha .r { flex: none; width: 5.6em; font-size: .62rem; letter-spacing: .05em; color: var(--ink-faint); }
+  .linha .v { font-weight: 600; font-size: .86rem; line-height: 1.25; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .linha .v.vazio { color: var(--ink-faint); font-weight: 400; }
+  /* destaque só por tipografia: a linha de aviso ativa fica em vídeo inverso */
+  .linha.alerta { background: var(--ink); }
+  .linha.alerta .r { color: var(--paper); opacity: .7; }
+  .linha.alerta .v { color: var(--paper); }
+  .grua.velha .idade { color: var(--vermelho); font-weight: 600; }
+
+  .rodape { font-size: .76rem; color: var(--ink-faint); border-top: 1px solid var(--line); padding-top: 12px;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .ponto { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); }
+  .ponto.ok { background: var(--verde); } .ponto.falha { background: var(--vermelho); }
+  .botao { font: inherit; font-size: .74rem; color: var(--ink-faint); background: var(--paper);
+    border: 1px solid var(--line); border-radius: 4px; padding: 5px 10px; cursor: pointer; margin-left: auto; }
+  .botao:hover { color: var(--ink); border-color: var(--line-strong); }
+  .sair-cheia { display: none; position: fixed; top: 10px; right: 10px; z-index: 20; font: inherit; font-size: .74rem;
+    color: var(--ink-faint); background: var(--card-bg); border: 1px solid var(--line); border-radius: 4px;
+    padding: 6px 12px; cursor: pointer; opacity: .45; }
+  .sair-cheia:hover { opacity: 1; }
+
+  /* tela cheia: 6x5 sem QR nem texto ao redor, para monitor de parede */
+  body.tela-cheia { padding: 10px; }
+  body.tela-cheia header, body.tela-cheia .rodape { display: none; }
+  body.tela-cheia .sair-cheia { display: block; }
+  body.tela-cheia main { max-width: none; min-height: calc(100vh - 20px); justify-content: center; }
+  body.tela-cheia .grade { grid-template-columns: repeat(6, 1fr); gap: 8px; }
+  body.tela-cheia .qr { display: none; }
+  @media (max-width: 900px) { body.tela-cheia .grade { grid-template-columns: repeat(3, 1fr); } }
+
+  .modal-qr { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: center;
+    justify-content: center; padding: 24px; z-index: 10; }
+  .modal-conteudo { background: #fff; color: #1d1f23; border-radius: 8px; padding: 22px; display: flex;
+    flex-direction: column; align-items: center; gap: 14px; max-width: 320px; }
+  .qr-grande { width: min(70vw, 260px); height: min(70vw, 260px); }
+  .qr-grande svg { display: block; width: 100%; height: 100%; }
+  .modal-rotulo { font-family: "Oswald", sans-serif; font-weight: 600; text-align: center; }
+  .modal-conteudo button { border-radius: 4px; padding: 9px 18px; font: inherit; font-weight: 600; cursor: pointer;
+    background: #eceef1; color: #1d1f23; border: 1px solid #c8ccd2; }
+</style>
+</head>
+<body>
+<main>
+  <button id="sair-cheia" class="sair-cheia" type="button">✕ Sair da tela cheia</button>
+  <header>
+    <span class="marca-hfort"><img src="img/hfort-logo.svg" alt="HFORT"></span>
+    <h1>Painel de fabricação — gruas</h1>
+    <p class="sub">30 gruas em fabricação, 5 linhas de texto cada — o estado da produção se lê, não se adivinha pela cor. Cada cartão tem um QR: abre o teclado daquela unidade, onde o operador digita etapa, situação, OP, nome e nota. Hoje o texto sobe para o <a href="dweet-local-demo.html">dweet-local</a>; a API do ERP vai consumir os mesmos campos. Experimento — nada aqui grava no ERP.</p>
+  </header>
+
+  <div class="grade" id="grade"></div>
+
+  <div class="rodape">
+    <span class="ponto" id="ponto"></span><span id="conexao">consultando o servidor…</span>
+    <button id="btn-cheia" class="botao" type="button">⛶ Tela cheia</button>
+  </div>
+
+  <div class="modal-qr" id="modal-qr" hidden>
+    <div class="modal-conteudo">
+      <div class="qr-grande" id="qr-grande"></div>
+      <div class="modal-rotulo" id="modal-rotulo"></div>
+      <button id="modal-fechar" type="button">Fechar</button>
+    </div>
+  </div>
+</main>
+
+<script src="qrcodegen.js"></script>
+<script src="gruas-campos.js"></script>
+<script>
+(() => {
+  const { API, TOTAL, CAMPOS, coisa } = window.GRUAS;
+  const INTERVALO_MS = 4000;
+  const VELHA_MS = 6 * 3600 * 1000;   // sem atualização há 6 h: idade em vermelho/negrito
+  const $ = (id) => document.getElementById(id);
+  const grade = $('grade');
+  const GRUAS = Array.from({ length: TOTAL }, (_, i) => ({ n: i + 1, coisa: coisa(i + 1), rotulo: `GRUA ${String(i + 1).padStart(2, '0')}` }));
+  let ultimaLeituraOk = 0;
+
+  const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+  const urlTeclado = (g) => `${new URL('dweet-local-gruas-teclado.html', location.href).href}#${g.coisa}:${encodeURIComponent(g.rotulo)}`;
+
+  function qrSvg(texto) {
+    const qr = qrcodegen.QrCode.encodeText(texto, qrcodegen.QrCode.Ecc.MEDIUM);
+    const m = 2, total = qr.size + m * 2;
+    let mod = '';
+    for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++)
+      if (qr.getModule(x, y)) mod += `<rect x="${x + m}" y="${y + m}" width="1" height="1"/>`;
+    return `<svg viewBox="0 0 ${total} ${total}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg"><rect width="${total}" height="${total}" fill="#fff"/><g fill="#000">${mod}</g></svg>`;
+  }
+
+  // O servidor devolve "created" das leituras em horário de Londres (GMT/BST);
+  // ver memória do dweet-local. Compensa o offset para a idade sair certa.
+  function offsetLondresMin() {
+    const tz = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', timeZoneName: 'shortOffset' })
+      .formatToParts(new Date()).find((p) => p.type === 'timeZoneName')?.value || 'GMT+0';
+    const m = tz.match(/GMT([+-]\d+)?/);
+    return m && m[1] ? parseInt(m[1], 10) * 60 : 0;
+  }
+  function dataCriado(bruto) {
+    if (!bruto) return null;
+    const d = new Date(bruto.replace(' ', 'T') + 'Z');
+    return Number.isNaN(d.getTime()) ? null : new Date(d.getTime() - offsetLondresMin() * 60000);
+  }
+  function duracao(ms) {
+    const s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 60) return `${s}s`;
+    const min = Math.floor(s / 60);
+    if (min < 60) return `${min}min`;
+    const h = Math.floor(min / 60);
+    if (h < 24) return min % 60 ? `${h}h${String(min % 60).padStart(2, '0')}` : `${h}h`;
+    const d = Math.floor(h / 24);
+    return h % 24 ? `${d}d${h % 24}h` : `${d}d`;
+  }
+
+  async function lerGrua(g) {
+    try {
+      const j = await (await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(g.coisa)}`)).json();
+      if (j.this !== 'succeeded') return { ok: true, conteudo: null, criado: null };
+      return { ok: true, conteudo: j.with?.[0]?.content || null, criado: dataCriado(j.with?.[0]?.created) };
+    } catch { return { ok: false }; }
+  }
+
+  function render(i, r) {
+    const card = grade.children[i];
+    if (!r.ok) { card.querySelector('.idade').textContent = 'sem sinal'; return; }
+    CAMPOS.forEach((c) => {
+      const linha = card.querySelector(`[data-campo="${c.id}"]`);
+      const v = r.conteudo && typeof r.conteudo[c.id] === 'string' ? r.conteudo[c.id] : '';
+      const el = linha.querySelector('.v');
+      el.textContent = v || '—';
+      el.classList.toggle('vazio', !v);
+      el.title = v;
+      linha.classList.toggle('alerta', !!c.alerta && c.alerta.includes(v));
+    });
+    const idade = r.criado ? Date.now() - r.criado.getTime() : null;
+    card.querySelector('.idade').textContent = idade === null ? '' : `há ${duracao(idade)}`;
+    card.classList.toggle('velha', idade !== null && idade > VELHA_MS);
+  }
+
+  async function lerTudo() {
+    const res = await Promise.all(GRUAS.map(lerGrua));
+    res.forEach((r, i) => render(i, r));
+    if (res.some((r) => r.ok)) ultimaLeituraOk = Date.now();
+    const sem = Math.round((Date.now() - (ultimaLeituraOk || Date.now())) / 1000);
+    const ok = ultimaLeituraOk && sem < 12;
+    $('ponto').className = 'ponto ' + (ok ? 'ok' : 'falha');
+    $('conexao').textContent = ok ? 'servidor conectado' : (ultimaLeituraOk ? `sem resposta há ${sem} s` : 'consultando o servidor…');
+  }
+
+  function abrirModal(g) {
+    $('qr-grande').innerHTML = qrSvg(urlTeclado(g));
+    $('modal-rotulo').textContent = `${g.rotulo} · aponte a câmera do celular`;
+    $('modal-qr').hidden = false;
+  }
+  const fecharModal = () => { $('modal-qr').hidden = true; };
+  $('modal-fechar').addEventListener('click', fecharModal);
+  $('modal-qr').addEventListener('click', (e) => { if (e.target === $('modal-qr')) fecharModal(); });
+
+  GRUAS.forEach((g) => {
+    const card = document.createElement('a');
+    card.className = 'grua';
+    card.href = urlTeclado(g);
+    card.target = '_blank';
+    card.rel = 'noopener';
+    const qr = document.createElement('div');
+    qr.className = 'qr';
+    qr.title = 'Toque para ampliar o QR do teclado desta unidade';
+    qr.innerHTML = qrSvg(urlTeclado(g));
+    qr.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); abrirModal(g); });
+    card.innerHTML = `<div class="cab"><span class="nome">${g.rotulo}</span><span class="idade">lendo…</span></div>` +
+      CAMPOS.map((c) => `<div class="linha" data-campo="${c.id}"><span class="r">${c.rotulo}</span><span class="v vazio">—</span></div>`).join('');
+    card.querySelector('.cab').append(qr);
+    // QR depois da idade: ordem visual nome | idade | QR
+    grade.append(card);
+  });
+
+  function aplicarTelaCheia(ligar) {
+    document.body.classList.toggle('tela-cheia', ligar);
+    const url = new URL(location.href);
+    if (ligar) url.searchParams.set('cheia', '1'); else url.searchParams.delete('cheia');
+    history.replaceState(null, '', url);
+  }
+  $('btn-cheia').addEventListener('click', () => { aplicarTelaCheia(true); document.documentElement.requestFullscreen?.().catch(() => {}); });
+  $('sair-cheia').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen?.(); aplicarTelaCheia(false); });
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) aplicarTelaCheia(false); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    fecharModal();
+    if (document.body.classList.contains('tela-cheia')) aplicarTelaCheia(false);
+  });
+  if (new URLSearchParams(location.search).has('cheia')) aplicarTelaCheia(true);
+
+  lerTudo();
+  setInterval(() => { if (!document.hidden) lerTudo(); }, INTERVALO_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) lerTudo(); });
+})();
+</script>
+</body>
+</html>

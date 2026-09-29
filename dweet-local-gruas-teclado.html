@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Teclado de fabricação — dweet-local</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Oswald:wght@500;600&display=swap">
+<style>
+  :root {
+    --paper: #EDF0E7; --card-bg: #F6F8F2; --ink: #1E2118; --ink-faint: #7C8271;
+    --steel: #33525E; --accent: #BE4E17; --line: #C7CDB9; --ok: #22c55e; --erro: #ef4444;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #14180F; --card-bg: #191E14; --ink: #E9EDE0; --ink-faint: #868E76;
+      --steel: #8FB3C0; --accent: #E4763C; --line: #2E3626; --ok: #4ade80; --erro: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--paper); color: var(--ink);
+    font: 400 16px/1.5 "IBM Plex Mono", ui-monospace, monospace; padding: 24px 16px 40px; }
+  main { max-width: 520px; margin: 0 auto; }
+  .marca { margin-bottom: 10px; }
+  .marca-hfort { display: inline-flex; align-items: center; background: #0b0d10; padding: 6px 12px 6px 8px; border-radius: 10px; }
+  .marca-hfort img { display: block; height: 56px; width: auto; }
+  h1 { font-family: "Oswald", sans-serif; font-weight: 600; font-size: 1.35rem; margin: 0 0 4px; }
+  .sub { color: var(--ink-faint); margin: 0 0 18px; font-size: .9rem; }
+  .sub a { color: var(--steel); }
+
+  .campo { background: var(--card-bg); border: 1px solid var(--line); border-left: 3px solid var(--steel);
+    border-radius: 4px; padding: 12px; margin-bottom: 12px; }
+  .campo-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .rotulo { font-family: "Oswald", sans-serif; font-weight: 600; letter-spacing: .06em; font-size: .85rem; color: var(--ink-faint); }
+  .valor { font-weight: 600; font-size: 1.05rem; text-align: right; }
+  .opcoes { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.op { appearance: none; font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer;
+    min-height: 48px; padding: 8px 14px; border-radius: 4px; color: var(--ink);
+    background: var(--paper); border: 1px solid var(--line); flex: 1 1 auto; }
+  button.op:active { transform: scale(.97); }
+  button.op[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  button.op:disabled { cursor: progress; opacity: .7; }
+  .texto { display: flex; gap: 8px; }
+  .texto input { flex: 1; min-width: 0; font: inherit; font-size: 1rem; min-height: 48px; padding: 8px 10px;
+    border-radius: 4px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
+  .texto input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  button.grava { appearance: none; font: inherit; font-weight: 600; min-height: 48px; padding: 0 16px; border-radius: 4px;
+    cursor: pointer; background: var(--ink); color: var(--paper); border: 1px solid var(--ink); }
+  button.grava:disabled { opacity: .7; cursor: progress; }
+  button.limpar { appearance: none; font: inherit; width: 100%; min-height: 44px; margin-top: 4px;
+    background: transparent; color: var(--ink-faint); border: 1px dashed var(--line); border-radius: 4px; cursor: pointer; }
+
+  .aviso { min-height: 1.4em; margin: 14px 2px 0; font-size: .9rem; }
+  .aviso.erro { color: var(--erro); } .aviso.ok { color: var(--ok); }
+  .rodape { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: .8rem; }
+  .ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); margin-right: 6px; }
+  .ponto.ok { background: var(--ok); } .ponto.falha { background: var(--erro); }
+  .sem-coisa { background: var(--card-bg); border: 1px solid var(--line); border-radius: 4px; padding: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="marca"><span class="marca-hfort"><img src="img/hfort-logo.svg" alt="HFORT"></span></div>
+  <h1 id="titulo">Teclado da grua</h1>
+  <p class="sub">Digite o estado de fabricação desta unidade — aparece no <a href="dweet-local-gruas.html">painel de fabricação</a>. Ainda não grava no ERP.</p>
+
+  <section id="app" hidden>
+    <div id="campos"></div>
+    <button class="limpar" id="limpar" type="button">Limpar todas as linhas</button>
+    <p class="aviso" id="aviso" role="status"></p>
+    <div class="rodape">
+      <p style="margin:0 0 6px">Botões gravam ao toque; campos de texto gravam em <b>Gravar</b> (ou Enter). O painel mostra em poucos segundos.</p>
+      <p style="margin:0"><span class="ponto" id="ponto"></span><span id="conexao">conectando ao servidor…</span></p>
+    </div>
+  </section>
+
+  <section id="sem-coisa" class="sem-coisa" hidden>
+    <strong>Link incompleto</strong>
+    <p class="sub" style="margin:6px 0 0">Abra este teclado a partir de um QR ou link do <a href="dweet-local-gruas.html">painel de gruas</a>.</p>
+  </section>
+</main>
+
+<script src="gruas-campos.js"></script>
+<script>
+(() => {
+  // Toy público: fala só com o dweet-local, sincronizando com dweet-local-gruas.html.
+  const { API, CAMPOS } = window.GRUAS;
+  const LEITURA_MS = 3000;
+  const COISA_VALIDA = /^[A-Za-z0-9_.\-]{6,120}$/;
+  const $ = (id) => document.getElementById(id);
+
+  let coisa = '';
+  let timer = null;
+  let enviando = false;
+  let ultimaLeituraOk = 0;
+  let atual = {};   // campo -> texto; vazio = nunca gravado
+
+  function decodeSeguro(s) { try { return decodeURIComponent(s); } catch { return s; } }
+  function coisaERotuloDoLink() {
+    const bruto = location.hash.slice(1);
+    const pos = bruto.indexOf(':');
+    return {
+      coisa: decodeSeguro(pos === -1 ? bruto : bruto.slice(0, pos)).trim(),
+      rotulo: pos === -1 ? '' : decodeSeguro(bruto.slice(pos + 1)).trim(),
+    };
+  }
+  const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+  function aviso(t, tipo = '') { $('aviso').textContent = t; $('aviso').className = 'aviso ' + tipo; }
+
+  // monta os 5 grupos uma vez só: botões de texto pronto ou campo livre
+  const wrap = $('campos');
+  const entradas = {};
+  CAMPOS.forEach((c) => {
+    const sec = document.createElement('div');
+    sec.className = 'campo';
+    sec.innerHTML = `<div class="campo-cab"><span class="rotulo">${c.rotulo}</span><span class="valor" data-valor="${c.id}">—</span></div>`;
+    if (c.tipo === 'texto') {
+      const f = document.createElement('form');
+      f.className = 'texto';
+      f.innerHTML = `<input type="text" maxlength="${c.max}" placeholder="${c.dica}" autocomplete="off" enterkeyhint="send"><button class="grava" type="submit">Gravar</button>`;
+      entradas[c.id] = f.querySelector('input');
+      f.addEventListener('submit', (e) => { e.preventDefault(); gravar({ ...atual, [c.id]: entradas[c.id].value.trim().toUpperCase() }); });
+      sec.append(f);
+    } else {
+      const ops = document.createElement('div');
+      ops.className = 'opcoes';
+      c.opcoes.forEach((o) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'op'; b.textContent = o;
+        b.dataset.campo = c.id; b.dataset.valor = o;
+        b.addEventListener('click', () => gravar({ ...atual, [c.id]: o }));
+        ops.append(b);
+      });
+      sec.append(ops);
+    }
+    wrap.append(sec);
+  });
+  const botoes = () => [...document.querySelectorAll('button.op, button.grava, button.limpar')];
+
+  function render() {
+    CAMPOS.forEach((c) => { document.querySelector(`[data-valor="${c.id}"]`).textContent = atual[c.id] || '—'; });
+    // não atropela o que o operador está digitando
+    CAMPOS.forEach((c) => { const i = entradas[c.id]; if (i && document.activeElement !== i) i.value = atual[c.id] || ''; });
+    document.querySelectorAll('button.op').forEach((b) =>
+      b.setAttribute('aria-pressed', String(atual[b.dataset.campo] === b.dataset.valor)));
+  }
+
+  async function ler() {
+    try {
+      const j = await (await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(coisa)}`)).json();
+      ultimaLeituraOk = Date.now();
+      if (!enviando) {
+        const c = j.this === 'succeeded' ? j.with?.[0]?.content : null;
+        atual = {};
+        CAMPOS.forEach((f) => { if (c && typeof c[f.id] === 'string') atual[f.id] = c[f.id]; });
+      }
+      $('ponto').className = 'ponto ok';
+      $('conexao').textContent = 'servidor conectado';
+    } catch {
+      $('ponto').className = 'ponto falha';
+      $('conexao').textContent = ultimaLeituraOk ? 'sem resposta do servidor' : 'sem contato com o servidor';
+    }
+    render();
+  }
+
+  // O dweet substitui o conteúdo inteiro: sempre mandamos as 5 linhas juntas.
+  async function gravar(novo) {
+    if (enviando) return;
+    enviando = true;
+    botoes().forEach((b) => (b.disabled = true));
+    aviso('Enviando…');
+    const qs = CAMPOS.map((c) => `${c.id}=${encodeURIComponent(novo[c.id] ?? '')}`).join('&');
+    try {
+      const j = await (await buscar(`${API}/dweet/for/${encodeURIComponent(coisa)}?${qs}`)).json();
+      if (j.this !== 'succeeded') throw new Error(j.because || 'recusado');
+      atual = novo;
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      aviso(`Salvo às ${hora}.`, 'ok');
+    } catch (e) {
+      const semContato = e.message === 'Failed to fetch' || e.name === 'TimeoutError';
+      aviso(`Não foi: ${semContato ? 'sem contato com o servidor' : e.message}. Tente de novo.`, 'erro');
+    } finally {
+      enviando = false;
+      botoes().forEach((b) => (b.disabled = false));
+      render();
+    }
+  }
+  $('limpar').addEventListener('click', () => gravar({}));
+
+  function iniciar() {
+    const { coisa: c, rotulo } = coisaERotuloDoLink();
+    coisa = c;
+    clearInterval(timer);
+    atual = {};
+    if (!COISA_VALIDA.test(coisa)) { $('app').hidden = true; $('sem-coisa').hidden = false; return; }
+    const titulo = rotulo || 'Teclado da unidade';
+    document.title = titulo;
+    $('titulo').textContent = titulo;
+    $('sem-coisa').hidden = true; $('app').hidden = false;
+    aviso('');
+    render();
+    ler();
+    timer = setInterval(() => { if (!document.hidden) ler(); }, LEITURA_MS);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && coisa) ler(); });
+  window.addEventListener('hashchange', iniciar);
+  iniciar();
+})();
+</script>
+</body>
+</html>
