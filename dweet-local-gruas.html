@@ -115,10 +115,10 @@
 </main>
 
 <script src="qrcodegen.js"></script>
-<script src="gruas-campos.js"></script>
+<script src="gruas-campos.js?v=2"></script>
 <script>
 (() => {
-  const { API, TOTAL, CAMPOS, NOMES, coisa } = window.GRUAS;
+  const { API, TOTAL, CAMPOS, NOMES = {}, coisa } = window.GRUAS;
   const INTERVALO_MS = 4000;
   const VELHA_MS = 6 * 3600 * 1000;   // sem atualização há 6 h: idade em vermelho/negrito
   const $ = (id) => document.getElementById(id);
