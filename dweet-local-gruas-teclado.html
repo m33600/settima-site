@@ -43,6 +43,10 @@
   button.op:active { transform: scale(.97); }
   button.op[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
   button.op:disabled { cursor: progress; opacity: .7; }
+  button.op[data-cor] { border-left: 6px solid var(--cor); }
+  button.op[data-cor="verde"] { --cor: var(--ok); }
+  button.op[data-cor="amarelo"] { --cor: #f2c200; }
+  button.op[data-cor="vermelho"] { --cor: var(--erro); }
   .texto { display: flex; gap: 8px; }
   .texto input { flex: 1; min-width: 0; font: inherit; font-size: 1rem; min-height: 48px; padding: 8px 10px;
     border-radius: 4px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); }
@@ -83,7 +87,7 @@
   </section>
 </main>
 
-<script src="gruas-campos.js?v=2"></script>
+<script src="gruas-campos.js?v=4"></script>
 <script>
 (() => {
   // Toy público: fala só com o dweet-local, sincronizando com dweet-local-gruas.html.
@@ -131,6 +135,7 @@
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'op'; b.textContent = o;
         b.dataset.campo = c.id; b.dataset.valor = o;
+        if (c.cores && c.cores[o]) b.dataset.cor = c.cores[o];
         b.addEventListener('click', () => gravar({ ...atual, [c.id]: o }));
         ops.append(b);
       });

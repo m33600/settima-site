@@ -12,13 +12,13 @@
   :root {
     --paper: #EDF0E7; --card-bg: #F6F8F2; --ink: #1E2118; --ink-soft: #565C4B; --ink-faint: #7C8271;
     --steel: #33525E; --accent: #BE4E17; --line: #C7CDB9; --line-strong: #A8AF97;
-    --verde: #22c55e; --vermelho: #ef4444;
+    --verde: #22c55e; --amarelo: #f2c200; --vermelho: #ef4444;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --paper: #14180F; --card-bg: #191E14; --ink: #E9EDE0; --ink-soft: #AFB79F; --ink-faint: #868E76;
       --steel: #8FB3C0; --accent: #E4763C; --line: #2E3626; --line-strong: #414B36;
-      --verde: #4ade80; --vermelho: #f87171;
+      --verde: #4ade80; --amarelo: #fde047; --vermelho: #f87171;
     }
   }
   * { box-sizing: border-box; }
@@ -51,10 +51,12 @@
   .linha .r { flex: none; width: 5.6em; font-size: .62rem; letter-spacing: .05em; color: var(--ink-faint); }
   .linha .v { font-weight: 600; font-size: .86rem; line-height: 1.25; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .linha .v.vazio { color: var(--ink-faint); font-weight: 400; }
-  /* destaque só por tipografia: a linha de aviso ativa fica em vídeo inverso */
-  .linha.alerta { background: var(--ink); }
-  .linha.alerta .r { color: var(--paper); opacity: .7; }
-  .linha.alerta .v { color: var(--paper); }
+  /* cor é só reforço do texto: marcador lateral + fundo bem leve, nunca a única pista */
+  .linha[data-cor] { padding-left: 8px; }
+  .linha[data-cor="verde"]    { --cor: var(--verde); }
+  .linha[data-cor="amarelo"]  { --cor: var(--amarelo); }
+  .linha[data-cor="vermelho"] { --cor: var(--vermelho); }
+  .linha[data-cor] { box-shadow: inset 4px 0 0 var(--cor); background: color-mix(in srgb, var(--cor) 16%, transparent); }
   .grua.velha .idade { color: var(--vermelho); font-weight: 600; }
 
   .rodape { font-size: .76rem; color: var(--ink-faint); border-top: 1px solid var(--line); padding-top: 12px;
@@ -77,6 +79,18 @@
   body.tela-cheia .grade { grid-template-columns: repeat(6, 1fr); gap: 8px; }
   body.tela-cheia .qr { display: none; }
   @media (max-width: 900px) { body.tela-cheia .grade { grid-template-columns: repeat(3, 1fr); } }
+
+  .botao.on { color: var(--ink); border-color: var(--accent); }
+  .msg { color: var(--ink-faint); }
+  .msg.erro { color: var(--vermelho); }
+  body.editando .nome { cursor: text; border-bottom: 1px dashed var(--accent); }
+  body.editando .nome::after { content: ' ✎'; font-size: .7em; color: var(--accent); }
+  .nome-input { font: inherit; font-family: "Oswald", sans-serif; font-weight: 600; letter-spacing: .04em;
+    font-size: 1.05rem; width: 100%; min-width: 0; color: var(--ink); background: var(--paper);
+    border: 1px solid var(--accent); border-radius: 3px; padding: 0 4px; text-transform: uppercase; }
+  .login { display: flex; flex-direction: column; gap: 10px; }
+  .login input { font: inherit; font-size: 1rem; padding: 9px 10px; border: 1px solid #c8ccd2; border-radius: 4px; }
+  .login .erro { color: #b3261e; font-size: .85rem; min-height: 1.2em; }
 
   .modal-qr { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: flex; align-items: center;
     justify-content: center; padding: 24px; z-index: 10; }
@@ -102,7 +116,19 @@
 
   <div class="rodape">
     <span class="ponto" id="ponto"></span><span id="conexao">consultando o servidor…</span>
-    <button id="btn-cheia" class="botao" type="button">⛶ Tela cheia</button>
+    <span class="msg" id="msg"></span>
+    <button id="btn-login" class="botao" type="button">🔒 Editar títulos</button>
+    <button id="btn-cheia" class="botao" type="button" style="margin-left:0">⛶ Tela cheia</button>
+  </div>
+
+  <div class="modal-qr" id="modal-login" hidden>
+    <form class="modal-conteudo login" id="form-login" autocomplete="off">
+      <div class="modal-rotulo">Entrar para editar os títulos</div>
+      <input id="senha" type="password" placeholder="senha" autocomplete="current-password" required>
+      <div class="erro" id="erro-login" role="alert"></div>
+      <button type="submit" id="entrar">Entrar</button>
+      <button type="button" id="cancelar-login">Cancelar</button>
+    </form>
   </div>
 
   <div class="modal-qr" id="modal-qr" hidden>
@@ -115,16 +141,21 @@
 </main>
 
 <script src="qrcodegen.js"></script>
-<script src="gruas-campos.js?v=2"></script>
+<script src="gruas-campos.js?v=4"></script>
 <script>
 (() => {
-  const { API, TOTAL, CAMPOS, NOMES = {}, coisa } = window.GRUAS;
+  const { API, TOTAL, CAMPOS, CONFIG, TITULO_MAX, coisa } = window.GRUAS;
   const INTERVALO_MS = 4000;
   const VELHA_MS = 6 * 3600 * 1000;   // sem atualização há 6 h: idade em vermelho/negrito
   const $ = (id) => document.getElementById(id);
   const grade = $('grade');
-  const GRUAS = Array.from({ length: TOTAL }, (_, i) => ({ n: i + 1, coisa: coisa(i + 1), rotulo: NOMES[i + 1] || `GRUA ${String(i + 1).padStart(2, '0')}` }));
+  const padrao = (n) => `GRUA ${String(n).padStart(2, '0')}`;
+  const GRUAS = Array.from({ length: TOTAL }, (_, i) => ({ n: i + 1, coisa: coisa(i + 1), rotulo: padrao(i + 1) }));
   let ultimaLeituraOk = 0;
+  const titulos = {};      // n -> título personalizado ('' = padrão), vindo da coisa de configuração
+  let senha = '';          // só na memória e no sessionStorage desta aba; nunca vai para o repositório
+  let editandoN = 0;       // cartão com o título em edição (a leitura periódica não o atropela)
+  try { senha = sessionStorage.getItem('gruasSenha') || ''; } catch {}
 
   const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
   const urlTeclado = (g) => `${new URL('dweet-local-gruas-teclado.html', location.href).href}#${g.coisa}:${encodeURIComponent(g.rotulo)}`;
@@ -162,6 +193,25 @@
     return h % 24 ? `${d}d${h % 24}h` : `${d}d`;
   }
 
+  function aplicarTitulo(g, card) {
+    const novo = titulos[g.n] || padrao(g.n);
+    if (novo === g.rotulo && card.dataset.pronto) return;
+    g.rotulo = novo;
+    card.dataset.pronto = '1';
+    if (editandoN !== g.n) card.querySelector('.nome').textContent = novo;
+    card.href = urlTeclado(g);
+    card.querySelector('.qr').innerHTML = qrSvg(urlTeclado(g));
+  }
+
+  async function lerConfig() {
+    try {
+      const j = await (await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(CONFIG)}`)).json();
+      const c = j.this === 'succeeded' ? (j.with?.[0]?.content || {}) : {};
+      GRUAS.forEach((g) => { titulos[g.n] = typeof c[`n${g.n}`] === 'string' ? c[`n${g.n}`] : ''; });
+    } catch { /* mantém os títulos que já tem */ }
+    GRUAS.forEach((g, i) => aplicarTitulo(g, grade.children[i]));
+  }
+
   async function lerGrua(g) {
     try {
       const j = await (await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(g.coisa)}`)).json();
@@ -180,7 +230,8 @@
       el.textContent = v || '—';
       el.classList.toggle('vazio', !v);
       el.title = v;
-      linha.classList.toggle('alerta', !!c.alerta && c.alerta.includes(v));
+      const cor = c.cores && c.cores[v];
+      if (cor) linha.dataset.cor = cor; else delete linha.dataset.cor;
     });
     const idade = r.criado ? Date.now() - r.criado.getTime() : null;
     card.querySelector('.idade').textContent = idade === null ? '' : `há ${duracao(idade)}`;
@@ -188,13 +239,104 @@
   }
 
   async function lerTudo() {
-    const res = await Promise.all(GRUAS.map(lerGrua));
+    const [res] = await Promise.all([Promise.all(GRUAS.map(lerGrua)), lerConfig()]);
     res.forEach((r, i) => render(i, r));
     if (res.some((r) => r.ok)) ultimaLeituraOk = Date.now();
     const sem = Math.round((Date.now() - (ultimaLeituraOk || Date.now())) / 1000);
     const ok = ultimaLeituraOk && sem < 12;
     $('ponto').className = 'ponto ' + (ok ? 'ok' : 'falha');
     $('conexao').textContent = ok ? 'servidor conectado' : (ultimaLeituraOk ? `sem resposta há ${sem} s` : 'consultando o servidor…');
+  }
+
+  function msg(t, erro) { $('msg').textContent = t; $('msg').className = 'msg' + (erro ? ' erro' : ''); }
+
+  // devolve 'ok' | 'senha' | 'bloqueio' | 'rede'
+  async function gravarTitulos(novos, chave) {
+    const corpo = new URLSearchParams();
+    GRUAS.forEach((g) => corpo.set(`n${g.n}`, novos[g.n] || ''));
+    corpo.set('key', chave);
+    try {
+      const r = await fetch(`${API}/dweet/for/${encodeURIComponent(CONFIG)}`, { method: 'POST', body: corpo, cache: 'no-store', signal: AbortSignal.timeout(8000) });
+      const j = await r.json();
+      if (j.this === 'succeeded') return 'ok';
+      return r.status === 429 ? 'bloqueio' : (r.status === 401 ? 'senha' : 'rede');
+    } catch { return 'rede'; }
+  }
+
+  function entrar(chave) {
+    senha = chave;
+    try { sessionStorage.setItem('gruasSenha', chave); } catch {}
+    aplicarModoEdicao();
+  }
+  function sair(aviso) {
+    senha = '';
+    try { sessionStorage.removeItem('gruasSenha'); } catch {}
+    aplicarModoEdicao();
+    if (aviso) msg(aviso, true);
+  }
+  function aplicarModoEdicao() {
+    const on = !!senha;
+    document.body.classList.toggle('editando', on);
+    $('btn-login').textContent = on ? '✎ Editando títulos · Sair' : '🔒 Editar títulos';
+    $('btn-login').classList.toggle('on', on);
+    if (on) msg('clique no título de um cartão para renomear'); else msg('');
+  }
+
+  $('btn-login').addEventListener('click', () => {
+    if (senha) return sair();
+    $('erro-login').textContent = ''; $('senha').value = '';
+    $('modal-login').hidden = false; $('senha').focus();
+  });
+  $('cancelar-login').addEventListener('click', () => { $('modal-login').hidden = true; });
+  $('form-login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const chave = $('senha').value;
+    $('entrar').disabled = true; $('erro-login').textContent = 'conferindo…';
+    // Entrar = regravar os títulos atuais com a senha: o servidor confere; nada muda de fato.
+    const r = await gravarTitulos(titulos, chave);
+    $('entrar').disabled = false;
+    if (r === 'ok') { $('modal-login').hidden = true; entrar(chave); }
+    else $('erro-login').textContent = { senha: 'Senha incorreta.', bloqueio: 'Muitas tentativas: aguarde 1 minuto.', rede: 'Sem contato com o servidor.' }[r];
+  });
+
+  function editarTitulo(g, card) {
+    if (editandoN) return;
+    editandoN = g.n;
+    const nome = card.querySelector('.nome');
+    const antigoHref = card.getAttribute('href');
+    card.removeAttribute('href');   // dentro de um link não dá para selecionar/digitar direito
+    const input = document.createElement('input');
+    input.className = 'nome-input'; input.maxLength = TITULO_MAX; input.value = g.rotulo;
+    input.setAttribute('aria-label', `Título do cartão ${g.n}`);
+    nome.textContent = ''; nome.append(input); input.focus(); input.select();
+    let feito = false;
+    const fechar = async (salvar) => {
+      if (feito) return; feito = true;
+      const novo = input.value.trim().toUpperCase();
+      editandoN = 0;
+      if (salvar && novo && novo !== g.rotulo) {
+        const anterior = titulos[g.n];
+        titulos[g.n] = novo === padrao(g.n) ? '' : novo;
+        nome.textContent = novo;
+        msg('salvando…');
+        const r = await gravarTitulos(titulos, senha);
+        if (r === 'ok') msg(`salvo: ${novo}`);
+        else {
+          titulos[g.n] = anterior;
+          if (r === 'senha') sair('a senha não vale mais — entre de novo');
+          else msg(r === 'bloqueio' ? 'muitas tentativas, aguarde 1 minuto' : 'não salvou: sem contato com o servidor', true);
+        }
+      }
+      card.dataset.pronto = '';
+      aplicarTitulo(g, card);
+      if (antigoHref) card.href = urlTeclado(g);
+    };
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); fechar(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fechar(false); }
+    });
+    input.addEventListener('blur', () => fechar(true));
+    input.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); });
   }
 
   function abrirModal(g) {
@@ -220,6 +362,11 @@
     card.innerHTML = `<div class="cab"><span class="nome">${g.rotulo}</span><span class="idade">lendo…</span></div>` +
       CAMPOS.map((c) => `<div class="linha" data-campo="${c.id}"><span class="r">${c.rotulo}</span><span class="v vazio">—</span></div>`).join('');
     card.querySelector('.cab').append(qr);
+    card.querySelector('.nome').addEventListener('click', (e) => {
+      if (!document.body.classList.contains('editando')) return;
+      e.preventDefault(); e.stopPropagation();
+      editarTitulo(g, card);
+    });
     // QR depois da idade: ordem visual nome | idade | QR
     grade.append(card);
   });
@@ -236,10 +383,12 @@
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     fecharModal();
+    $('modal-login').hidden = true;
     if (document.body.classList.contains('tela-cheia')) aplicarTelaCheia(false);
   });
   if (new URLSearchParams(location.search).has('cheia')) aplicarTelaCheia(true);
 
+  aplicarModoEdicao();
   lerTudo();
   setInterval(() => { if (!document.hidden) lerTudo(); }, INTERVALO_MS);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) lerTudo(); });
