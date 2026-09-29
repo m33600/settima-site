@@ -118,12 +118,12 @@
 <script src="gruas-campos.js"></script>
 <script>
 (() => {
-  const { API, TOTAL, CAMPOS, coisa } = window.GRUAS;
+  const { API, TOTAL, CAMPOS, NOMES, coisa } = window.GRUAS;
   const INTERVALO_MS = 4000;
   const VELHA_MS = 6 * 3600 * 1000;   // sem atualização há 6 h: idade em vermelho/negrito
   const $ = (id) => document.getElementById(id);
   const grade = $('grade');
-  const GRUAS = Array.from({ length: TOTAL }, (_, i) => ({ n: i + 1, coisa: coisa(i + 1), rotulo: `GRUA ${String(i + 1).padStart(2, '0')}` }));
+  const GRUAS = Array.from({ length: TOTAL }, (_, i) => ({ n: i + 1, coisa: coisa(i + 1), rotulo: NOMES[i + 1] || `GRUA ${String(i + 1).padStart(2, '0')}` }));
   let ultimaLeituraOk = 0;
 
   const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });

@@ -7,6 +7,8 @@
 window.GRUAS = {
   API: 'https://dweet.settima.com.br',
   TOTAL: 30,
+  // nome de exibição das unidades que não usam o padrão "GRUA nn"
+  NOMES: { 1: 'LASER' },
   coisa: (n) => `settima-dweetlocal-grua-${n}`,
   CAMPOS: [
     { id: 'etapa', rotulo: 'ETAPA', tipo: 'opcoes',
