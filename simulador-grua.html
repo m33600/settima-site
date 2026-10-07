@@ -160,12 +160,11 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
  *   alarme se max(hCotovelo, hPonta) >= limite; histerese de 5 cm              */
 const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390], '8800LI': [1.77, 3.975, 2.795] };
 const HIST = 0.05;
-// Giro do 8800LI: 420° de curso, com batente nas duas pontas.
+// Giro do 8800LI: 420° de curso, simétrico em volta do zero (±210°), com batente nas duas pontas.
 // O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido no sentido anti-horário visto de cima:
-// o 0° é a lança PERPENDICULAR ao caminhão. Os batentes são físicos e acompanham o zero: eram ±210° em volta
-// do rumo da cabine, agora [-300°, +120°]. Para um curso simétrico em volta do novo zero, use GIRO_LIM = [-210, 210].
+// o 0° é a lança PERPENDICULAR ao caminhão. A posição de transporte (lança sobre a cabine) lê -GIRO_ZERO.
 const GIRO_ZERO = 90;
-const GIRO_LIM = [-210 - GIRO_ZERO, 210 - GIRO_ZERO];
+const GIRO_LIM = [-210, 210];
 const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
 const T1 = [3, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
 
@@ -400,7 +399,7 @@ const loc = (ang, x, y, z) => [x*Math.cos(ang) - y*Math.sin(ang), x*Math.sin(ang
  * uma biela (B→R) liga o balancim à lança. A posição de B sai da interseção de dois círculos
  * (balancim × biela) e o cilindro estica ou encolhe sozinho conforme o ângulo da lança.
  * Coordenadas (u,w): u ao longo do braço a partir do pivô, w perpendicular (para cima).   */
-const MOSTRA_PISTAO = false;   // o pistão do joelho fica escondido por enquanto; mude para true para devolvê-lo
+const MOSTRA_PISTAO = false;   // cilindros hidráulicos (do braço e do joelho) escondidos por enquanto; mude para true para devolvê-los
 const KOFF = 0.30;
 const KN = { Qu: -0.70, Qw: 0.22, Cu: 0.35, b: 0.80, a: 0.95, abre: 125, r: 1.10, rs: 0.80, rh: 0.20, Y: 0.20 };
 let thB = rad(40);
@@ -445,7 +444,7 @@ function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
   if (MOSTRA_PISTAO) viga(f, P(A, -Y), P(A, Y), 0.09, 0.09, PN);
   for (const y of [-Y, Y]) {
     viga(f, P(Q, y), P(B, y), 0.06, 0.13, AC);
-    viga(f, P(Q, y), P(A, y), 0.06, 0.13, AC);
+    if (MOSTRA_PISTAO) viga(f, P(Q, y), P(A, y), 0.06, 0.13, AC);   // perna do balancim que recebe o cilindro
     viga(f, P(B, y), P(R, y), 0.05, 0.09, BI);
     for (const q of [Q, B, R]) viga(f, P(q, y - 0.03), P(q, y + 0.03), 0.14, 0.14, PN);   // olhais
   }
@@ -471,7 +470,7 @@ function constroi() {
   // estabilizadores
   for (const y of [-1, 1]) for (const x of [-1.9, 0.9]) {
     viga(f, [x, y*0.8, 0.62], [x, y*2.0, 0.62], 0.2, 0.2, CH);
-    viga(f, [x, y*2.0, 0.05], [x, y*2.0, 0.62], 0.18, 0.18, CZ);
+    viga(f, [x, y*2.0, 0.05], [x, y*2.0, 0.62], 0.2, 0.2, CH);          // apoio do estabilizador (poste estrutural, sem haste)
     viga(f, [x, y*2.0, 0.0], [x, y*2.0, 0.07], 0.5, 0.5, PT);
   }
   // coluna e torre (giram)
@@ -484,10 +483,12 @@ function constroi() {
   const dB = loc(psi, Math.cos(t1), 0, Math.sin(t1));
   const P1 = add(P0, mul(dB, l1));
   viga(f, P0, P1, 0.3, 0.34, AM);
-  // cilindro do braço
-  const cb0 = loc(psi, -0.35, 0, l0 - 0.6);
-  const cb1 = add(P0, mul(dB, l1 * 0.28)); cb1[2] -= 0.12;
-  viga(f, cb0, cb1, 0.12, 0.12, CZ);
+  // cilindro de elevação do braço (escondido junto com o do joelho; ver MOSTRA_PISTAO)
+  if (MOSTRA_PISTAO) {
+    const cb0 = loc(psi, -0.35, 0, l0 - 0.6);
+    const cb1 = add(P0, mul(dB, l1 * 0.28)); cb1[2] -= 0.12;
+    viga(f, cb0, cb1, 0.12, 0.12, CZ);
+  }
   // lança
   const dL = loc(psi, Math.cos(a2), 0, Math.sin(a2));
   const P2 = add(P1, mul(dL, l2));
