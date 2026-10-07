@@ -103,7 +103,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <button id="bDemo">▶ Demonstração</button>
   <button id="bVista">Vista: 3D</button>
   <button id="bSom">🔊 Som</button>
-  <button id="bBle" title="Transmite os ângulos por Bluetooth, como os sensores reais, para o tablet. Precisa da ponte local neste PC: rode  sim-ble">◉ Saída BLE</button>
+  <button id="bBle" title="Transmite os ângulos por Bluetooth, como os sensores reais, para o tablet. Precisa da ponte local neste PC: rode  sim-ble --abrir  (ela serve esta mesma página em http://127.0.0.1:8777, sem internet)">◉ Saída BLE</button>
   <button id="bTransf" class="on">◜ Transferidores</button>
   <label class="opac" title="Transparência dos transferidores">opacidade <input type="range" id="rOpac" min="5" max="100" value="100"></label>
   <button id="bTela">⛶ Tela cheia</button>
@@ -718,7 +718,7 @@ $('rOpac').oninput = e => { aplicaOpac(e.target.value); try { localStorage.setIt
 /* ============ Saída Bluetooth ============
  * A página não fala Bluetooth de periférico; quem anuncia é a ponte local (tools/sim-ble-ponte.py, comando `sim-ble`),
  * que recebe os ângulos por HTTP em 127.0.0.1 e os transmite como os sensores reais. Ver o cabeçalho da ponte. */
-const PONTE = 'http://127.0.0.1:8777';
+const PONTE = (location.hostname === '127.0.0.1' && location.port === '8777') ? location.origin : 'http://127.0.0.1:8777';   // servida pela ponte: mesma origem, sem aviso do Chrome
 let ble = false, bleTimer = null, bleErros = 0;
 function bleEstado(txt, cls) {
   $('vBle').textContent = txt; $('vBle').style.color = cls === 'ok' ? 'var(--good)' : cls === 'erro' ? 'var(--crit)' : '';
@@ -732,7 +732,7 @@ async function bleEnvia() {
       body: JSON.stringify({ giro: S.giro, t1: S.t1, t2: S.t2, pressao: S.pressao }) });
     const j = await r.json(); bleErros = 0;
     bleEstado(j.no_ar ? 'no ar (' + j.anuncios + ' sensores)' : j.erro ? 'erro: ' + j.erro : 'ligando…', j.no_ar ? 'ok' : j.erro ? 'erro' : '');
-  } catch (e) { bleErros++; bleEstado('ponte offline — rode: sim-ble', 'erro'); }
+  } catch (e) { bleErros++; bleEstado(PONTE === location.origin ? 'ponte parou — rode: sim-ble' : 'sem ponte — rode sim-ble e abra 127.0.0.1:8777', 'erro'); }
   finally { clearTimeout(to); }
   if (ble) bleTimer = setTimeout(bleEnvia, bleErros ? 1000 : 100);
 }
