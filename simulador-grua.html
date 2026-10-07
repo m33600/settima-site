@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>HFORT 4.0 — Simulador de Grua</title>
+<style>
+:root {
+  --bg: #14160F;
+  --bg2: #1D2018;
+  --ink: #E8EBDF;
+  --ink-soft: #A6AC98;
+  --line: #363A2D;
+  --accent: #E07A3C;
+  --steel: #8FB2BC;
+  --good: #82BC85;
+  --warn: #D9AE58;
+  --crit: #E2574A;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+  font-family: system-ui, 'IBM Plex Sans', sans-serif; overflow: hidden; touch-action: none; user-select: none; }
+#cena { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+#cena:active { cursor: grabbing; }
+
+header { position: absolute; top: 0; left: 0; right: 0; display: flex; gap: 8px; align-items: center;
+  padding: 10px 16px; flex-wrap: wrap; pointer-events: none; }
+header > * { pointer-events: auto; }
+h1 { font-size: 16px; margin: 0 8px 0 0; letter-spacing: .08em; font-weight: 700; }
+h1 span { color: var(--accent); }
+.badge { font-size: 11px; letter-spacing: .12em; border: 1px solid var(--warn); color: var(--warn);
+  padding: 2px 8px; border-radius: 3px; }
+button, select, input[type=number] { font: inherit; font-size: 13px; background: var(--bg2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button:hover { border-color: var(--steel); }
+button.on { background: var(--accent); color: #1A1200; border-color: var(--accent); font-weight: 600; }
+.sp { flex: 1; }
+
+#painel { position: absolute; top: 56px; right: 12px; width: 260px; background: rgba(29,32,24,.88);
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px; backdrop-filter: blur(4px); }
+#status { text-align: center; font-weight: 800; font-size: 26px; letter-spacing: .08em; padding: 12px 6px;
+  border-radius: 8px; background: #23422A; color: var(--good); transition: background .15s; }
+#status.pre { background: #4A3C14; color: var(--warn); }
+#status.alarme { background: #6A1F18; color: #FFD9D3; animation: pisca .35s steps(2) infinite; }
+@keyframes pisca { 50% { filter: brightness(1.6); } }
+.lin { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0;
+  border-bottom: 1px solid var(--line); color: var(--ink-soft); }
+.lin b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+.eixos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 4px; }
+.eixo { text-align: center; font-size: 11px; padding: 6px 2px; border-radius: 6px; background: var(--bg);
+  border: 1px solid var(--line); color: var(--ink-soft); letter-spacing: .06em; }
+.eixo.mov { border-color: var(--good); color: var(--good); }
+.eixo.blq { border-color: var(--crit); color: var(--crit); background: #2A1512; }
+.cfg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--ink-soft); }
+.cfg label { display: flex; flex-direction: column; gap: 3px; }
+.cfg input, .cfg select { width: 100%; padding: 5px 6px; }
+#ensinar { grid-column: 1 / -1; margin-top: 4px; }
+#log { margin-top: 10px; font-size: 11px; color: var(--ink-soft); height: 64px; overflow: hidden;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace; line-height: 1.5; }
+#log div:first-child { color: var(--ink); }
+
+.pad { position: absolute; bottom: 70px; width: 150px; height: 150px; border-radius: 50%;
+  background: rgba(29,32,24,.7); border: 2px solid var(--line); touch-action: none; }
+.pad.v { width: 90px; border-radius: 45px; }
+.pad .knob { position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px;
+  border-radius: 50%; background: var(--accent); opacity: .9; box-shadow: 0 2px 8px #0008; pointer-events: none; }
+.pad .rot { position: absolute; font-size: 11px; color: var(--ink-soft); letter-spacing: .08em; pointer-events: none; }
+#padL { left: 20px; } #padR { right: 20px; }
+#teclas { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 14px; color: var(--ink-soft); pointer-events: none; }
+kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px; padding: 2px 8px; color: var(--ink); font-size: 13px; }
+
+@media (max-width: 760px) {
+  #painel { top: auto; bottom: 230px; right: 8px; left: 8px; width: auto; }
+  #teclas { display: none; }
+  .pad { bottom: 14px; }
+}
+</style>
+</head>
+<body>
+
+<svg id="cena" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet">
+  <defs>
+    <linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1B2230"/><stop offset="1" stop-color="#14160F"/>
+    </linearGradient>
+  </defs>
+  <rect x="-2000" y="-2000" width="5600" height="5000" fill="url(#ceu)"/>
+  <g id="chao"></g>
+  <g id="sombra"></g>
+  <g id="obj"></g>
+  <g id="teto"></g>
+  <g id="rot"></g>
+</svg>
+
+<header>
+  <h1>HFORT <span>4.0</span> · SIMULADOR DE GRUA</h1>
+  <span class="badge">SIMULAÇÃO</span>
+  <span class="sp"></span>
+  <button id="bDemo">▶ Demonstração</button>
+  <button id="bVista">Vista: 3D</button>
+  <button id="bSom">🔊 Som</button>
+  <button id="bTela">⛶ Tela cheia</button>
+</header>
+
+<aside id="painel">
+  <div id="status">LIVRE</div>
+  <div class="eixos">
+    <div class="eixo" id="eG">GIRO</div>
+    <div class="eixo" id="eB">BRAÇO</div>
+    <div class="eixo" id="eL">LANÇA</div>
+  </div>
+  <div class="lin"><span>Giro</span><b id="vG">0°</b></div>
+  <div class="lin"><span>Braço (θ1)</span><b id="vB">0°</b></div>
+  <div class="lin"><span>Lança (θ2)</span><b id="vL">0°</b></div>
+  <div class="lin"><span>Altura do cotovelo</span><b id="vHE">0 m</b></div>
+  <div class="lin"><span>Altura da ponta</span><b id="vHT">0 m</b></div>
+  <div class="lin"><span>Pressão (simulada)</span><b id="vP">0 bar</b></div>
+  <div class="cfg">
+    <label>Modelo
+      <select id="selModelo"><option>5570LI</option><option>7700LI</option><option selected>8800LI</option></select>
+    </label>
+    <label>Pré-aviso (m)
+      <select id="selPre"><option value="0">desligado</option><option value="0.25">0,25</option><option value="0.5" selected>0,50</option><option value="1">1,00</option></select>
+    </label>
+    <label>Limite (m)
+      <input type="number" id="inLim" min="2" max="9" step="0.05" value="4.75">
+    </label>
+    <label>&nbsp;<button id="bZera">Zerar grua</button></label>
+    <button id="bPark" style="grid-column:1/-1">⤓ ESTACIONAR (dobrar lança)</button>
+    <button id="ensinar">ENSINAR LIMITE nesta posição</button>
+  </div>
+  <div id="log"></div>
+</aside>
+
+<div class="pad" id="padL"><div class="knob"></div>
+  <span class="rot" style="top:6px;left:50%;transform:translateX(-50%)">BRAÇO ▲</span>
+  <span class="rot" style="bottom:6px;left:50%;transform:translateX(-50%)">BRAÇO ▼</span>
+  <span class="rot" style="left:6px;top:50%;transform:translateY(-50%)">◀</span>
+  <span class="rot" style="right:6px;top:50%;transform:translateY(-50%)">▶</span>
+</div>
+<div class="pad v" id="padR" data-eixo="y"><div class="knob"></div>
+  <span class="rot" style="top:6px;left:50%;transform:translateX(-50%)">LANÇA ▲</span>
+  <span class="rot" style="bottom:6px;left:50%;transform:translateX(-50%)">LANÇA ▼</span>
+</div>
+
+<div id="teclas">
+  <kbd>←</kbd> <kbd>→</kbd> giro &nbsp;·&nbsp; <kbd>↑</kbd> <kbd>↓</kbd> braço &nbsp;·&nbsp;
+  <kbd>W</kbd> <kbd>S</kbd> (ou <kbd>Q</kbd> <kbd>E</kbd>, <kbd>PgUp</kbd> <kbd>PgDn</kbd>) <b>lança</b> &nbsp;·&nbsp; <kbd>espaço</kbd> demonstração &nbsp;·&nbsp;
+  arraste = girar a câmera, roda = zoom &nbsp;·&nbsp; controle de videogame também funciona
+</div>
+
+<script>
+'use strict';
+/* ============ Modelo (mesmas fórmulas do núcleo hfort_nucleo.h) ============
+ *   hCotovelo = l0 + l1*sin(t1)
+ *   hPonta    = l0 + l1*sin(t1) + l2*sin(t1 - t2)
+ *   alarme se max(hCotovelo, hPonta) >= limite; histerese de 5 cm              */
+const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390], '8800LI': [1.77, 3.975, 2.795] };
+const HIST = 0.05;
+const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
+const T1 = [3, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
+
+const S = { modelo: '8800LI', giro: 20, t1: 22, t2: 10, limite: 4.75, pre: 0.5,
+            alarme: false, pregao: false, pressao: 1.8, vel: { g: 0, b: 0, l: 0 }, blq: { g: false, b: false, l: false } };
+const rad = d => d * Math.PI / 180;
+const fmt = (v, n = 2) => v.toFixed(n).replace('.', ',');
+
+function alturas(t1 = S.t1, t2 = S.t2) {
+  const [l0, l1, l2] = MODELOS[S.modelo];
+  const hE = l0 + l1 * Math.sin(rad(t1));
+  return { hE, hT: hE + l2 * Math.sin(rad(t1 - t2)) };
+}
+const maxH = (t1, t2) => { const a = alturas(t1, t2); return Math.max(a.hE, a.hT); };
+
+/* ============ Log ============ */
+const logEl = document.getElementById('log');
+function log(msg) {
+  const d = document.createElement('div');
+  const h = new Date().toLocaleTimeString('pt-BR');
+  d.textContent = h + '  ' + msg;
+  logEl.prepend(d);
+  while (logEl.children.length > 4) logEl.lastChild.remove();
+}
+
+/* ============ Entradas ============ */
+const teclas = new Set();
+const pad = { L: { x: 0, y: 0 }, R: { x: 0, y: 0 } };
+let demo = false, estaciona = false;
+const POSE_PARK = { g: 0, t1: 6, t2: 178 };
+
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); alternaDemo(); return; }
+  teclas.add(e.code); audioLiga();
+  if (e.code.startsWith('Arrow')) e.preventDefault();
+});
+addEventListener('keyup', e => teclas.delete(e.code));
+addEventListener('blur', () => teclas.clear());
+
+function ligaPad(el, estado) {
+  const knob = el.querySelector('.knob');
+  const soY = el.dataset.eixo === 'y';
+  let ativo = null;
+  const move = e => {
+    const r = el.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    const raio = (soY ? r.height : r.width) / 2 - 30;
+    let dx = soY ? 0 : e.clientX - cx, dy = e.clientY - cy;
+    const m = Math.hypot(dx, dy);
+    if (m > raio) { dx *= raio / m; dy *= raio / m; }
+    knob.style.transform = `translate(${dx}px,${dy}px)`;
+    estado.x = dx / raio; estado.y = -dy / raio;
+  };
+  el.addEventListener('pointerdown', e => { ativo = e.pointerId; el.setPointerCapture(ativo); audioLiga(); move(e); });
+  el.addEventListener('pointermove', e => { if (e.pointerId === ativo) move(e); });
+  const fim = e => { if (e.pointerId !== ativo) return; ativo = null; knob.style.transform = ''; estado.x = estado.y = 0; };
+  el.addEventListener('pointerup', fim); el.addEventListener('pointercancel', fim);
+}
+ligaPad(document.getElementById('padL'), pad.L);
+ligaPad(document.getElementById('padR'), pad.R);
+
+function leGamepad() {
+  const g = (navigator.getGamepads && [...navigator.getGamepads()].find(x => x));
+  if (!g) return { g: 0, b: 0, l: 0 };
+  const z = v => Math.abs(v) < 0.15 ? 0 : v;
+  return { g: z(g.axes[0] || 0), b: -z(g.axes[1] || 0), l: -z(g.axes[3] || 0) };
+}
+
+/* Demonstração: dirige a grua sozinha por poses, passando do limite de propósito */
+const ROTEIRO = [
+  { g: 40, t1: 30, t2: 10 }, { g: 95, t1: 62, t2: 2 }, { g: -30, t1: 25, t2: 45 },
+  { g: -80, t1: 55, t2: 3 }, { g: 0, t1: 20, t2: 20 },
+];
+let passo = 0, tPasso = 0;
+function entradaDemo(dt) {
+  const alvo = ROTEIRO[passo];
+  const dg = -(((alvo.g - S.giro + 540) % 360) - 180);
+  const sat = (e, tol) => Math.max(-1, Math.min(1, e / tol));
+  const e = { g: sat(dg, 6), b: sat(alvo.t1 - S.t1, 3), l: sat(S.t2 - alvo.t2, 3) };   // lança "sobe" = reduz t2
+  tPasso += dt;
+  const chegou = Math.abs(dg) < 1.5 && Math.abs(alvo.t1 - S.t1) < 1 && Math.abs(S.t2 - alvo.t2) < 1;
+  const travado = tPasso > 2 && (S.blq.b || S.blq.l) && Math.abs(dg) < 1.5;
+  if (chegou || travado || tPasso > 14) { if (travado) log('Demo: movimento travado pelo limite'); passo = (passo + 1) % ROTEIRO.length; tPasso = 0; }
+  return e;
+}
+
+function entradas(dt) {
+  const k = c => teclas.has(c);
+  const kb = {
+    g: (k('ArrowLeft') || k('KeyA') ? -1 : 0) + (k('ArrowRight') || k('KeyD') ? 1 : 0),
+    b: (k('ArrowUp') ? 1 : 0) + (k('ArrowDown') ? -1 : 0),
+    l: (k('KeyW') || k('KeyQ') || k('PageUp') ? 1 : 0) + (k('KeyS') || k('KeyE') || k('PageDown') ? -1 : 0),
+  };
+  const gp = leGamepad();
+  const m = { g: kb.g + pad.L.x + gp.g, b: kb.b + pad.L.y + gp.b, l: kb.l + pad.R.y + gp.l };
+  const manual = m.g || m.b || m.l;
+  if (estaciona && manual) { estaciona = false; log('Estacionar cancelado'); }
+  if (estaciona) {
+    const A = POSE_PARK, sat = (e, tol) => Math.max(-1, Math.min(1, e / tol));
+    const dg = ((A.g - S.giro + 540) % 360) - 180;
+    // primeiro baixa o braço e gira; a lança fecha por último, para não varrer o chão
+    const e = { g: -sat(dg, 6), b: sat(A.t1 - S.t1, 3), l: sat(S.t2 - A.t2, 4) };
+    if (Math.abs(dg) < 1.5 && Math.abs(A.t1 - S.t1) < 0.7 && Math.abs(S.t2 - A.t2) < 1.5) { estaciona = false; log('Grua estacionada'); }
+    return { g: e.g, b: e.b, l: e.l };
+  }
+  if (demo && manual) alternaDemo();                     // tocou: a demonstração larga o comando
+  const r = demo ? entradaDemo(dt) : m;
+  const c = v => Math.max(-1, Math.min(1, v));
+  return { g: c(r.g), b: c(r.b), l: c(r.l) };
+}
+
+/* ============ Física ============ */
+function passa(dt) {
+  const inp = entradas(dt);
+  const alvo = { g: inp.g * VEL.g, b: inp.b * VEL.b, l: inp.l * VEL.l };   // °/s desejados
+  const a = Math.min(1, dt / 0.25);
+  const cur = maxH(S.t1, S.t2);
+  for (const e of ['g', 'b', 'l']) S.vel[e] += (alvo[e] - S.vel[e]) * a;
+
+  // bloqueio: com alarme ligado, nenhum movimento pode ALTA a altura (o relé corta o hidráulico de subir)
+  const tenta = (db, dl) => maxH(S.t1 + db, S.t2 + dl) > cur + 1e-6;
+  S.blq.g = false;
+  S.blq.b = S.alarme && S.vel.b !== 0 && tenta(S.vel.b * dt, 0);
+  S.blq.l = S.alarme && S.vel.l !== 0 && tenta(0, -S.vel.l * dt);
+  if (S.blq.b) S.vel.b = 0;
+  if (S.blq.l) S.vel.l = 0;
+
+  S.giro = (S.giro - S.vel.g * dt + 360) % 360;      // direita = horário visto de cima
+  S.t1 = Math.max(T1[0], Math.min(T1[1], S.t1 + S.vel.b * dt));
+  S.t2 = Math.max(T2[0], Math.min(T2[1], S.t2 - S.vel.l * dt));
+
+  // alarme com histerese
+  const h = maxH(S.t1, S.t2);
+  if (!S.alarme && h >= S.limite) { S.alarme = true; log(`ALARME  ${fmt(h)} m ≥ limite ${fmt(S.limite)} m — subir bloqueado`); }
+  else if (S.alarme && h < S.limite - HIST) { S.alarme = false; log('Alarme liberado'); }
+  const ini = S.limite - S.pre;
+  if (S.pre > 0) {
+    if (!S.pregao && h >= ini && !S.alarme) { S.pregao = true; log(`Pré-aviso  ${fmt(h)} m`); }
+    else if (S.pregao && h < ini - HIST) S.pregao = false;
+  } else S.pregao = false;
+
+  const mov = Math.abs(S.vel.g) + Math.abs(S.vel.b) + Math.abs(S.vel.l) > 0.8;
+  S.pressao += ((mov ? 85 : 1.8) - S.pressao) * Math.min(1, dt * 2);
+  S.movendo = { g: Math.abs(S.vel.g) > 0.8, b: Math.abs(S.vel.b) > 0.4, l: Math.abs(S.vel.l) > 0.4 };
+}
+
+/* ============ Som ============ */
+let ctx = null, mudo = false, proxBip = 0;
+function audioLiga() { if (!ctx) try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} if (ctx && ctx.state === 'suspended') ctx.resume(); }
+function bip(freq, dur) {
+  if (!ctx || mudo) return;
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = 'square'; o.frequency.value = freq; g.gain.value = 0.05;
+  o.connect(g); g.connect(ctx.destination);
+  const t = ctx.currentTime; o.start(t); g.gain.setValueAtTime(0.05, t + dur); g.gain.linearRampToValueAtTime(0, t + dur + 0.01); o.stop(t + dur + 0.02);
+}
+function buzzer(agora) {
+  if (agora < proxBip) return;
+  if (S.alarme) { bip(1800, 0.1); proxBip = agora + 0.2; }
+  else if (S.pregao) {
+    const h = maxH(S.t1, S.t2), f = Math.max(0, Math.min(1, (h - (S.limite - S.pre)) / S.pre));
+    bip(1200, 0.08); proxBip = agora + 0.9 - 0.6 * f;
+  }
+}
+
+/* ============ 3D ============ */
+const cam = { az: rad(-38), el: rad(17), D: 17, alvo: [0.5, 0, 2.3] };
+const F = 1350, CX = 800, CY = 470;
+const VISTAS = [
+  { n: '3D', az: -38, el: 17 }, { n: 'Lateral', az: 0, el: 3 }, { n: 'Cima', az: 0, el: 89 }, { n: 'Frente', az: 90, el: 3 },
+];
+let vistaI = 0;
+
+const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+const add = (a, b) => [a[0]+b[0], a[1]+b[1], a[2]+b[2]];
+const mul = (a, k) => [a[0]*k, a[1]*k, a[2]*k];
+const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+const norm = a => { const m = Math.hypot(...a) || 1; return [a[0]/m, a[1]/m, a[2]/m]; };
+
+let C = null;
+function preparaCamera() {
+  const { az, el, D, alvo } = cam;
+  const pos = [alvo[0] + D*Math.cos(el)*Math.sin(az), alvo[1] - D*Math.cos(el)*Math.cos(az), alvo[2] + D*Math.sin(el)];
+  const f = norm(sub(alvo, pos));
+  let r = cross(f, [0, 0, 1]);
+  if (Math.hypot(...r) < 1e-4) r = [Math.cos(az), Math.sin(az), 0];     // olhando de cima
+  r = norm(r);
+  C = { pos, f, r, u: cross(r, f) };
+}
+function proj(p) {
+  const d = sub(p, C.pos), z = dot(d, C.f);
+  const k = F / Math.max(0.1, z);
+  return [CX + dot(d, C.r) * k, CY - dot(d, C.u) * k, z];
+}
+
+const LUZ = norm([-0.4, -0.5, 0.8]);
+const FACES = [[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]];
+function viga(out, p0, p1, w, h, cor) {
+  const d = sub(p1, p0);
+  let up = Math.abs(d[2]) / (Math.hypot(...d) || 1) > 0.97 ? [1, 0, 0] : [0, 0, 1];
+  const u = norm(cross(d, up)), v = norm(cross(u, d));
+  const q = [];
+  for (const a of [-1, 1]) for (const b of [-1, 1]) for (const e of [p0, p1])
+    q.push(add(e, add(mul(u, a*w/2), mul(v, b*h/2))));
+  // índices: bit0 = extremo, bit1 = b, bit2 = a  → reordena para FACES
+  const cen = mul(add(p0, p1), 0.5);
+  for (const f of FACES) {
+    const pts = f.map(i => q[i]);
+    let n = norm(cross(sub(pts[1], pts[0]), sub(pts[2], pts[0])));
+    const fc = mul(add(add(pts[0], pts[1]), add(pts[2], pts[3])), 0.25);
+    if (dot(n, sub(fc, cen)) < 0) n = mul(n, -1);
+    if (dot(n, sub(C.pos, fc)) <= 0) continue;               // face de trás
+    const s = 0.42 + 0.58 * Math.max(0, dot(n, LUZ));
+    const P = pts.map(proj);
+    out.push({ P, z: (P[0][2]+P[1][2]+P[2][2]+P[3][2]) / 4, cor: cor.map(c => Math.min(255, c * s | 0)) });
+  }
+}
+const loc = (ang, x, y, z) => [x*Math.cos(ang) - y*Math.sin(ang), x*Math.sin(ang) + y*Math.cos(ang), z];
+
+
+/* ============ Joelho (bi-articulação) ============
+ * Quadrilátero articulado: cilindro (C→A) empurra o balancim (pivô Q no braço, pontas A e B);
+ * uma biela (B→R) liga o balancim à lança. A posição de B sai da interseção de dois círculos
+ * (balancim × biela) e o cilindro estica ou encolhe sozinho conforme o ângulo da lança.
+ * Coordenadas (u,w): u ao longo do braço a partir do pivô, w perpendicular (para cima).   */
+const KOFF = 0.30;
+const KN = { Qu: -0.70, Qw: 0.22, Cu: 0.35, b: 0.80, a: 0.95, abre: 125, r: 1.10, rs: 0.80, rh: 0.20, Y: 0.34 };
+let thB = rad(40);
+const Rjib = (t2) => [KOFF * Math.sin(t2) + KN.rs * Math.cos(t2) + KN.rh * Math.sin(t2),
+                      -KOFF + KOFF * Math.cos(t2) - KN.rs * Math.sin(t2) + KN.rh * Math.cos(t2)];   // relativo ao fim do braço
+function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
+  const t2 = rad(t2d);
+  const nB = loc(psi, -Math.sin(t1), 0, Math.cos(t1));
+  const lado = y => loc(psi, 0, y, 0);
+  const to3 = (u, w, y) => add(add(add(P0, mul(dB, u)), mul(nB, w)), lado(y));
+  const Q = [l1 + KN.Qu, KN.Qw];
+  const r = KN.r;
+  const Rj = Rjib(t2), R = [l1 + Rj[0], Rj[1]];
+  // interseção círculo(Q,b) × círculo(R,r)
+  const dx = R[0] - Q[0], dy = R[1] - Q[1], d = Math.hypot(dx, dy) || 1e-6;
+  let cand;
+  if (d > KN.b + r || d < Math.abs(KN.b - r)) cand = [Math.atan2(dy, dx) + (d < Math.abs(KN.b - r) && r > KN.b ? Math.PI : 0)];
+  else {
+    const aa = (KN.b * KN.b - r * r + d * d) / (2 * d), hh = Math.sqrt(Math.max(0, KN.b * KN.b - aa * aa));
+    const mx = Q[0] + aa * dx / d, my = Q[1] + aa * dy / d;
+    cand = [[mx - hh * dy / d, my + hh * dx / d], [mx + hh * dy / d, my - hh * dx / d]].map(q => Math.atan2(q[1] - Q[1], q[0] - Q[0]));
+  }
+  const dif = (x, y) => Math.abs(Math.atan2(Math.sin(x - y), Math.cos(x - y)));
+  thB = cand.reduce((m, c) => dif(c, thB) < dif(m, thB) ? c : m);
+  const B = [Q[0] + KN.b * Math.cos(thB), Q[1] + KN.b * Math.sin(thB)];
+  const thA = thB + rad(KN.abre);
+  const A = [Q[0] + KN.a * Math.cos(thA), Q[1] + KN.a * Math.sin(thA)];
+  const C = [KN.Cu * l1, KN.Qw], Y = KN.Y, AC = [75, 80, 78], PN = [34, 36, 34], BI = [190, 194, 186];
+  const P = (q, y = Y) => to3(q[0], q[1], y);
+
+  // bloco do joelho: carcaça no fim do braço + pino atravessando até a lança e as placas
+  viga(f, to3(l1 - 0.35, -0.12, 0), to3(l1 + 0.02, -0.12, 0), 0.4, 0.62, [170, 120, 24]);
+  viga(f, to3(l1, -KOFF, -0.15), to3(l1, -KOFF, Y + 0.12), 0.16, 0.16, PN);
+  // pinos laterais ligando o braço e a lança ao plano do mecanismo
+  for (const q of [Q, C]) viga(f, P(q, 0), P(q, Y), 0.09, 0.09, PN);
+  viga(f, P(R, 0), P(R, Y), 0.09, 0.09, PN);
+  // balancim (duas pernas) + biela + cilindro
+  viga(f, P(Q), P(B), 0.07, 0.13, AC);
+  viga(f, P(Q), P(A), 0.07, 0.13, AC);
+  viga(f, P(B), P(R), 0.05, 0.08, BI);
+  const mid = [(C[0] + A[0]) / 2, (C[1] + A[1]) / 2];
+  viga(f, P(C), P(mid), 0.07, 0.16, CZ);
+  viga(f, P(mid), P(A), 0.05, 0.09, [215, 218, 210]);
+  for (const q of [Q, A, B, C]) viga(f, P(q, Y - 0.05), P(q, Y + 0.06), 0.14, 0.14, PN);   // olhais dos pinos
+}
+
+function constroi() {
+  const [l0, l1, l2] = MODELOS[S.modelo];
+  const f = [];
+  const psi = rad(S.giro), t1 = rad(S.t1), a2 = rad(S.t1 - S.t2);
+  const AM = [226, 164, 28], LA = [222, 128, 30], CZ = [150, 155, 150], PT = [38, 40, 36], CH = [72, 80, 86];
+
+  // caminhão
+  viga(f, [-2.4, 0, 0.62], [1.6, 0, 0.62], 1.7, 0.35, CH);
+  viga(f, [1.6, 0, 1.1], [2.5, 0, 1.1], 1.7, 1.4, [205, 207, 200]);        // cabine
+  for (const x of [-1.7, -0.6, 1.8]) for (const y of [-0.95, 0.95])
+    viga(f, [x, y*0.97 - 0.2*Math.sign(y), 0.45], [x, y*0.97 + 0.2*Math.sign(y), 0.45], 0.9, 0.9, PT);
+  // estabilizadores
+  for (const y of [-1, 1]) for (const x of [-1.9, 0.9]) {
+    viga(f, [x, y*0.8, 0.62], [x, y*2.0, 0.62], 0.2, 0.2, CH);
+    viga(f, [x, y*2.0, 0.05], [x, y*2.0, 0.62], 0.18, 0.18, CZ);
+    viga(f, [x, y*2.0, 0.0], [x, y*2.0, 0.07], 0.5, 0.5, PT);
+  }
+  // coluna e torre (giram)
+  const P0 = [0, 0, l0];
+  viga(f, [0, 0, 0.8], [0, 0, l0 - 0.25], 0.62, 0.62, [92, 98, 102]);
+  viga(f, loc(psi, -0.55, 0, l0 - 0.85), loc(psi, 0.1, 0, l0 - 0.85), 0.8, 0.8, [60, 64, 62]);   // contrapeso/cabine do giro (marca o giro)
+  viga(f, loc(psi, 0, 0, l0 - 0.3), loc(psi, 0, 0, l0 + 0.1), 0.5, 0.5, [100, 106, 108]);
+
+  // braço
+  const dB = loc(psi, Math.cos(t1), 0, Math.sin(t1));
+  const P1 = add(P0, mul(dB, l1));
+  viga(f, P0, P1, 0.3, 0.34, AM);
+  // cilindro do braço
+  const cb0 = loc(psi, -0.35, 0, l0 - 0.6);
+  const cb1 = add(P0, mul(dB, l1 * 0.28)); cb1[2] -= 0.12;
+  viga(f, cb0, cb1, 0.12, 0.12, CZ);
+  // lança
+  const dL = loc(psi, Math.cos(a2), 0, Math.sin(a2));
+  const P2 = add(P1, mul(dL, l2));
+  const corL = S.alarme && (Date.now() % 400 < 200) ? [226, 60, 40] : LA;
+  // Joelho: o pino K fica KOFF abaixo do eixo do braço e a lança carrega um suporte rígido até o seu eixo.
+  // Esticada (θ2=0) o eixo da lança é colinear com o do braço; dobrada (180°) ela fica paralela, ABAIXO do braço.
+  const nB = loc(psi, -Math.sin(t1), 0, Math.cos(t1));
+  const nL = loc(psi, -Math.sin(a2), 0, Math.cos(a2));          // "para cima" da lança
+  const K = add(P1, mul(nB, -KOFF));
+  const J1 = add(K, mul(nL, KOFF)), J2 = add(J1, mul(dL, l2));
+  viga(f, K, J1, 0.2, 0.2, [170, 120, 24]);                     // suporte do joelho (rígido com a lança)
+  viga(f, J1, J2, 0.22, 0.24, corL);
+  joelho(f, psi, t1, S.t2, P0, dB, l1, CZ);
+  viga(f, P1, add(P1, [0, 0, 0.01]), 0.38, 0.38, [90, 94, 92]);              // articulação
+  // gancho
+  const G = [J2[0], J2[1], J2[2] - 1.1];
+  viga(f, J2, G, 0.03, 0.03, [30, 30, 28]);
+  viga(f, G, [G[0], G[1], G[2] - 0.22], 0.22, 0.22, [200, 200, 195]);
+  return { f, P0, P1, P2: J2 };
+}
+
+const NS = 'http://www.w3.org/2000/svg';
+const gChao = document.getElementById('chao'), gSombra = document.getElementById('sombra'),
+      gObj = document.getElementById('obj'), gTeto = document.getElementById('teto'), gRot = document.getElementById('rot');
+const pt = p => p[0].toFixed(1) + ',' + p[1].toFixed(1);
+
+function desenha() {
+  preparaCamera();
+  const { f, P1, P2 } = constroi();
+
+  // chão
+  let s = '';
+  for (let i = -8; i <= 8; i += 1) {
+    const a = proj([i, -8, 0]), b = proj([i, 8, 0]), c = proj([-8, i, 0]), d = proj([8, i, 0]);
+    const op = i === 0 ? .5 : .22;
+    s += `<line x1="${a[0]|0}" y1="${a[1]|0}" x2="${b[0]|0}" y2="${b[1]|0}" stroke="#8FB2BC" stroke-opacity="${op}"/>`;
+    s += `<line x1="${c[0]|0}" y1="${c[1]|0}" x2="${d[0]|0}" y2="${d[1]|0}" stroke="#8FB2BC" stroke-opacity="${op}"/>`;
+  }
+  gChao.innerHTML = s;
+
+  // sombra do braço e da lança no chão (dá a noção de altura)
+  const q0 = proj([0, 0, 0]), q1 = proj([P1[0], P1[1], 0]), q2 = proj([P2[0], P2[1], 0]);
+  gSombra.innerHTML = `<polyline points="${pt(q0)} ${pt(q1)} ${pt(q2)}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+  // objetos (algoritmo do pintor)
+  f.sort((a, b) => b.z - a.z);
+  gObj.innerHTML = f.map(q => `<polygon points="${q.P.map(pt).join(' ')}" fill="rgb(${q.cor})" stroke="rgba(0,0,0,.35)" stroke-width="1" stroke-linejoin="round"/>`).join('');
+
+  // teto/limite
+  const cor = S.alarme ? '#E2574A' : S.pregao ? '#D9AE58' : '#82BC85', corLim = cor;
+  const plano = (z, op, dash, sw, cor = corLim) => {
+    const c = [[-8,-8],[8,-8],[8,8],[-8,8]].map(([x, y]) => proj([x, y, z]));
+    return `<polygon points="${c.map(pt).join(' ')}" fill="${cor}" fill-opacity="${op}" stroke="${cor}" stroke-width="${sw}" stroke-dasharray="${dash}"/>`;
+  };
+  let t = plano(S.limite, S.alarme ? .16 : .07, '14 8', 2);
+  if (S.pre > 0) t += plano(S.limite - S.pre, 0, '3 7', 1, '#D9AE58');
+  const lb = proj([-8, -8, S.limite]);
+  t += `<text x="${lb[0]|0}" y="${(lb[1] - 8)|0}" fill="${cor}" font-size="22" font-weight="700" font-family="monospace">LIMITE ${fmt(S.limite)} m</text>`;
+  gTeto.innerHTML = t;
+
+  // prumo da ponta com a altura
+  const a = proj(P2), b = proj([P2[0], P2[1], 0]);
+  const { hT } = alturas();
+  gRot.innerHTML =
+    `<line x1="${a[0]|0}" y1="${a[1]|0}" x2="${b[0]|0}" y2="${b[1]|0}" stroke="${cor}" stroke-width="2" stroke-dasharray="6 6"/>` +
+    `<circle cx="${b[0]|0}" cy="${b[1]|0}" r="6" fill="none" stroke="${cor}" stroke-width="2"/>` +
+    `<text x="${(a[0] + 14)|0}" y="${(a[1] - 12)|0}" fill="#E8EBDF" font-size="26" font-weight="700" font-family="monospace" stroke="#14160F" stroke-width="5" paint-order="stroke">${fmt(hT)} m</text>`;
+}
+
+/* ============ Painel ============ */
+const $ = id => document.getElementById(id);
+function painel() {
+  const { hE, hT } = alturas();
+  $('vG').textContent = (Math.round(S.giro) % 360) + '°';
+  $('vB').textContent = fmt(S.t1, 1) + '°';
+  $('vL').textContent = fmt(S.t2, 1) + '°';
+  $('vHE').textContent = fmt(hE) + ' m';
+  $('vHT').textContent = fmt(hT) + ' m';
+  $('vP').textContent = fmt(S.pressao, 1) + ' bar';
+  const st = $('status');
+  st.className = S.alarme ? 'alarme' : S.pregao ? 'pre' : '';
+  st.textContent = S.alarme ? 'ALARME — LIMITE' : S.pregao ? 'PRÉ-AVISO' : 'LIVRE';
+  for (const [id, e] of [['eG', 'g'], ['eB', 'b'], ['eL', 'l']]) {
+    const el = $(id), nome = { g: 'GIRO', b: 'BRAÇO', l: 'LANÇA' }[e];
+    el.className = 'eixo' + (S.blq[e] ? ' blq' : S.movendo && S.movendo[e] ? ' mov' : '');
+    el.textContent = S.blq[e] ? nome + ' ⛔' : nome;
+  }
+}
+
+/* ============ Controles da interface ============ */
+function alternaDemo() {
+  demo = !demo; passo = 0; tPasso = 0;
+  $('bDemo').classList.toggle('on', demo);
+  $('bDemo').textContent = demo ? '■ Parar demonstração' : '▶ Demonstração';
+  log(demo ? 'Demonstração ligada' : 'Demonstração parada');
+  audioLiga();
+}
+$('bDemo').onclick = alternaDemo;
+$('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; log('Estacionando…'); audioLiga(); };
+$('bSom').onclick = () => { mudo = !mudo; $('bSom').textContent = mudo ? '🔇 Mudo' : '🔊 Som'; audioLiga(); };
+$('bTela').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
+$('bVista').onclick = () => {
+  vistaI = (vistaI + 1) % VISTAS.length;
+  const v = VISTAS[vistaI]; cam.az = rad(v.az); cam.el = rad(v.el);
+  $('bVista').textContent = 'Vista: ' + v.n;
+};
+$('selModelo').onchange = e => { S.modelo = e.target.value; log('Modelo ' + S.modelo); };
+$('selPre').onchange = e => { S.pre = +e.target.value; };
+$('inLim').onchange = e => { const v = +e.target.value; if (v >= 2 && v <= 9) S.limite = v; e.target.value = S.limite; log('Limite ' + fmt(S.limite) + ' m'); };
+$('bZera').onclick = () => { Object.assign(S, { giro: 0, t1: 3, t2: 0 }); S.alarme = S.pregao = false; log('Grua zerada'); };
+$('ensinar').onclick = () => {
+  const h = maxH(S.t1, S.t2), [l0] = MODELOS[S.modelo];
+  if (h < l0 + 0.5) { log('Recusado: pose baixa demais'); return; }
+  S.limite = Math.round(h * 20) / 20; $('inLim').value = S.limite.toFixed(2);
+  S.alarme = false; log('LIMITE ENSINADO ' + fmt(S.limite) + ' m');
+};
+
+// câmera: arrastar e roda
+let drag = null;
+const cena = $('cena');
+cena.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; });
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  cam.az -= (e.clientX - drag.x) * 0.006;
+  cam.el = Math.max(rad(2), Math.min(rad(89), cam.el + (e.clientY - drag.y) * 0.005));
+  drag = { x: e.clientX, y: e.clientY };
+});
+addEventListener('pointerup', () => drag = null);
+cena.addEventListener('wheel', e => { e.preventDefault(); cam.D = Math.max(8, Math.min(30, cam.D * (1 + Math.sign(e.deltaY) * 0.08))); }, { passive: false });
+
+/* ============ Laço ============ */
+let tAnt = performance.now();
+function quadro(agora) {
+  const dt = Math.min(0.05, (agora - tAnt) / 1000); tAnt = agora;
+  passa(dt); buzzer(agora / 1000); desenha(); painel();
+  requestAnimationFrame(quadro);
+}
+log('Simulador pronto');
+requestAnimationFrame(quadro);
+</script>
+</body>
+</html>
