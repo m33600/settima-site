@@ -30,6 +30,8 @@ h1 { font-size: 16px; margin: 0 8px 0 0; letter-spacing: .08em; font-weight: 700
 h1 span { color: var(--accent); }
 .badge { font-size: 11px; letter-spacing: .12em; border: 1px solid var(--warn); color: var(--warn);
   padding: 2px 8px; border-radius: 3px; }
+label.opac { font-size: 12px; color: var(--ink-soft); display: flex; align-items: center; gap: 6px; background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; }
+label.opac input { width: 90px; accent-color: var(--accent); }
 button, select, input[type=number] { font: inherit; font-size: 13px; background: var(--bg2); color: var(--ink);
   border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 button:hover { border-color: var(--steel); }
@@ -102,6 +104,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <button id="bVista">Vista: 3D</button>
   <button id="bSom">🔊 Som</button>
   <button id="bTransf" class="on">◜ Transferidores</button>
+  <label class="opac" title="Transparência dos transferidores">opacidade <input type="range" id="rOpac" min="5" max="100" value="100"></label>
   <button id="bTela">⛶ Tela cheia</button>
 </header>
 
@@ -574,28 +577,28 @@ const lin3 = (a, b, cor, sw, op, dash = '') => { const A = proj(a), B = proj(b);
  * cur: ângulo atual; lim: [min,max] do curso; rot: rótulo; rotulo a cada `passoRot` graus */
 function transferidor(c, e1, e2, r, a0, a1, cur, lim, rot, passoRot, ref = 0, omite = [], aRot = null) {
   let o = '';
-  o += `<polyline points="${poli(c, e1, e2, r, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".55" stroke-width="1.6"/>`;
-  o += `<polyline points="${poli(c, e1, e2, r - 0.07, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".18" stroke-width="1"/>`;
+  o += `<polyline points="${poli(c, e1, e2, r, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".55" stroke-width="1"/>`;
+  o += `<polyline points="${poli(c, e1, e2, r - 0.07, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".18" stroke-width="0.6"/>`;
   for (let a = Math.ceil(a0 / 5) * 5; a <= a1; a += 5) {
     const mai = a % 30 === 0, med = a % 10 === 0, ln = mai ? 0.24 : med ? 0.15 : 0.08;
-    o += lin3(arc3(c, e1, e2, r, a), arc3(c, e1, e2, r - ln, a), CI, mai ? 1.6 : 1, mai ? .85 : .5);
+    o += lin3(arc3(c, e1, e2, r, a), arc3(c, e1, e2, r - ln, a), CI, mai ? 1 : 0.6, mai ? .85 : .5);
     if (a % passoRot === 0 && !omite.includes(a)) o += txt(arc3(c, e1, e2, r + 0.34, a), a);
   }
   // fim de curso (batentes)
-  for (const a of lim) if (a >= a0 && a <= a1) o += lin3(arc3(c, e1, e2, r - 0.34, a), arc3(c, e1, e2, r + 0.14, a), VM, 3, .95);
+  for (const a of lim) if (a >= a0 && a <= a1) o += lin3(arc3(c, e1, e2, r - 0.34, a), arc3(c, e1, e2, r + 0.14, a), VM, 2, .95);
   // arco varrido + ponteiro
   const bate = cur <= lim[0] + 0.05 || cur >= lim[1] - 0.05, cor = bate ? VM : CIV;
   if (Math.abs(cur - ref) > 0.2) {
-    o += `<polyline points="${poli(c, e1, e2, r - 0.14, ref, cur)}" fill="none" stroke="${cor}" stroke-opacity=".22" stroke-width="9" stroke-linecap="round"/>`;
-    o += `<polyline points="${poli(c, e1, e2, r - 0.14, ref, cur)}" fill="none" stroke="${cor}" stroke-opacity=".95" stroke-width="2.4" stroke-linecap="round"/>`;
+    o += `<polyline points="${poli(c, e1, e2, r - 0.14, ref, cur)}" fill="none" stroke="${cor}" stroke-opacity=".2" stroke-width="5" stroke-linecap="round"/>`;
+    o += `<polyline points="${poli(c, e1, e2, r - 0.14, ref, cur)}" fill="none" stroke="${cor}" stroke-opacity=".95" stroke-width="1.5" stroke-linecap="round"/>`;
   }
   const tip = arc3(c, e1, e2, r + 0.12, cur);
-  o += lin3(c, tip, cor, 2, .9);
+  o += lin3(c, tip, cor, 1.2, .9);
   const q = proj(tip);
-  o += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="4.5" fill="${cor}"/>`;
+  o += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="3.2" fill="${cor}"/>`;
   o += txt(arc3(c, e1, e2, r + 0.8, aRot ?? cur), `${rot} ${fmt(cur, 1)}°`, { cor, op: 1, fs: 16, dy: 5 });
   const qc = proj(c);
-  o += `<circle cx="${qc[0].toFixed(1)}" cy="${qc[1].toFixed(1)}" r="3.5" fill="none" stroke="${CI}" stroke-width="1.5"/>`;
+  o += `<circle cx="${qc[0].toFixed(1)}" cy="${qc[1].toFixed(1)}" r="3" fill="none" stroke="${CI}" stroke-width="1"/>`;
   return o;
 }
 
@@ -610,13 +613,13 @@ function desenhaTransf(P0, P1) {
   if (GIRO_LIM[1] > 180) extras.push([180, GIRO_LIM[1]]);
   if (GIRO_LIM[0] < -180) extras.push([GIRO_LIM[0], -180]);
   for (const [a0, a1] of extras) {
-    g += `<polyline points="${poli(O, X, Yv, Rg + 0.7, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".55" stroke-width="1.6"/>`;
+    g += `<polyline points="${poli(O, X, Yv, Rg + 0.7, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".55" stroke-width="1"/>`;
     for (let a = a0; a <= a1; a += 5) {
       const mai = a % 30 === 0;
-      g += lin3(arc3(O, X, Yv, Rg + 0.7, a), arc3(O, X, Yv, Rg + 0.7 - (mai ? 0.24 : 0.1), a), CI, mai ? 1.6 : 1, .7);
+      g += lin3(arc3(O, X, Yv, Rg + 0.7, a), arc3(O, X, Yv, Rg + 0.7 - (mai ? 0.24 : 0.1), a), CI, mai ? 1 : 0.6, .7);
       if ((a % 30 === 0 && Math.abs(a) !== 180) || GIRO_LIM.includes(a)) g += txt(arc3(O, X, Yv, Rg + 1.1, a), a);
     }
-    for (const a of GIRO_LIM) if (a >= a0 && a <= a1) g += lin3(arc3(O, X, Yv, Rg + 0.36, a), arc3(O, X, Yv, Rg + 0.84, a), VM, 3, .95);   // batente no anel externo
+    for (const a of GIRO_LIM) if (a >= a0 && a <= a1) g += lin3(arc3(O, X, Yv, Rg + 0.36, a), arc3(O, X, Yv, Rg + 0.84, a), VM, 2, .95);   // batente no anel externo
   }
   gTrChao.innerHTML = g;
 
@@ -625,10 +628,10 @@ function desenhaTransf(P0, P1) {
   const dB = [Math.cos(t1) * h[0], Math.cos(t1) * h[1], Math.sin(t1)];
   const nB = [-Math.sin(t1) * h[0], -Math.sin(t1) * h[1], Math.cos(t1)];
   let a = transferidor(P0, h, Z, 1.7, 0, 90, S.t1, T1, 'BRAÇO', 30, 0, [], 90);
-  a += lin3(P0, add(P0, mul(h, 2.3)), CI, 1, .5, '5 6');                 // horizontal de referência
+  a += lin3(P0, add(P0, mul(h, 2.3)), CI, 0.7, .5, '5 6');                 // horizontal de referência
   const down = mul(nB, -1);
   a += transferidor(P1, dB, down, 1.5, 0, 180, S.t2, T2, 'LANÇA', 30, 0, [], 90);
-  a += lin3(P1, add(P1, mul(dB, 2.3)), CI, 1, .5, '5 6');                 // prolongamento do braço (0° da lança)
+  a += lin3(P1, add(P1, mul(dB, 2.3)), CI, 0.7, .5, '5 6');                 // prolongamento do braço (0° da lança)
   gTrAr.innerHTML = a;
 }
 
@@ -705,6 +708,11 @@ function alternaDemo() {
   log(demo ? 'Demonstração ligada' : 'Demonstração parada');
   audioLiga();
 }
+// opacidade dos transferidores (lembrada neste navegador)
+function aplicaOpac(v) { gTrChao.style.opacity = gTrAr.style.opacity = v / 100; }
+try { const v = localStorage.getItem('simGruaOpac'); if (v) $('rOpac').value = v; } catch (e) {}
+aplicaOpac($('rOpac').value);
+$('rOpac').oninput = e => { aplicaOpac(e.target.value); try { localStorage.setItem('simGruaOpac', e.target.value); } catch (x) {} };
 $('bTransf').onclick = () => { mostraTransf = !mostraTransf; $('bTransf').classList.toggle('on', mostraTransf); };
 $('bDemo').onclick = alternaDemo;
 $('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; faseDobra = false; log('Estacionando…'); audioLiga(); };
