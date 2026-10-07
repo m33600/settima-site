@@ -193,7 +193,7 @@ function log(msg) {
 /* ============ Entradas ============ */
 const teclas = new Set();
 const pad = { L: { x: 0, y: 0 }, R: { x: 0, y: 0 } };
-let demo = false, estaciona = false, faseDobra = false;
+let demo = false, estaciona = false, faseDobra = false, parkTrava = 0;
 const POSE_PARK = { g: 0, t1: 6, t2: 178 };               // transporte: giro em zero, braço baixo, lança dobrada
 
 addEventListener('keydown', e => {
@@ -266,12 +266,25 @@ function entradas(dt) {
   if (estaciona) {
     const A = POSE_PARK, sat = (e, tol) => Math.max(-1, Math.min(1, e / tol));
     const dg = A.g - S.giro;
-    // em duas fases: 1) gira até o zero, com braço e lança parados; 2) só então baixa o braço e dobra a lança
+    // fases: 1) gira até o zero, com braço e lança parados; 2) levanta o braço e dobra a lança AO MESMO TEMPO — o chão
+    // freia a dobra enquanto o braço está baixo e o alarme de altura freia a subida enquanto a lança está esticada
+    // (dobrar baixa a ponta e libera o alarme); 3) com a lança dobrada, baixa o braço de novo
     if (Math.abs(dg) > 0.7 && !faseDobra) return { g: -sat(dg, 6), b: 0, l: 0 };
-    if (!faseDobra) { faseDobra = true; log('Giro em zero — dobrando a lança'); }
-    const e = { b: sat(A.t1 - S.t1, 3), l: sat(S.t2 - A.t2, 4) };
-    if (Math.abs(A.t1 - S.t1) < 0.7 && Math.abs(S.t2 - A.t2) < 1.5) { estaciona = false; faseDobra = false; log('Grua estacionada'); }
-    return { g: -sat(dg, 6), b: e.b, l: e.l };      // o giro segue travado em zero durante a dobra
+    if (!faseDobra) { faseDobra = true; parkTrava = 0; log('Giro em zero — dobrando a lança'); }
+    const dobrada = Math.abs(S.t2 - A.t2) < 1.5;
+    let b, l;
+    if (!dobrada) {
+      const need = t1Minimo(S.t2) + 1;                                  // elevação exigida pelo que falta dobrar, +1°
+      b = S.t1 < need - 0.3 ? sat(need - S.t1, 3) : 0;                  // sobe o braço até a elevação exigida
+      l = sat(S.t2 - A.t2, 4);                                          // e dobra a lança (o chão trava o que não couber)
+    } else {
+      b = sat(A.t1 - S.t1, 3); l = 0;                                   // lança dobrada: agora o braço desce
+      if (Math.abs(A.t1 - S.t1) < 0.7) { estaciona = false; faseDobra = false; log('Grua estacionada'); }
+    }
+    const semProgresso = (b > 0 || l > 0) && (b <= 0 || S.blq.b) && (l <= 0 || S.blq.l);     // os dois eixos travados
+    parkTrava = semProgresso ? parkTrava + dt : 0;
+    if (parkTrava > 2) { estaciona = false; faseDobra = false; log('Estacionar parou: o limite de altura e o chão travam a manobra'); }
+    return { g: -sat(dg, 6), b, l };      // o giro segue travado em zero
   }
   if (demo && manual) alternaDemo();                     // tocou: a demonstração larga o comando
   const r = demo ? entradaDemo(dt) : m;
@@ -280,6 +293,25 @@ function entradas(dt) {
 }
 
 /* ============ Física ============ */
+/* ============ Chão ============
+ * Altura da parte mais baixa da lança (a junta do joelho ou a ponta, menos meia espessura), em metros.
+ * Mesmas fórmulas do desenho: o pino K fica KOFF abaixo do eixo do braço e a lança sai de um suporte rígido. */
+function folgaChao(t1d, t2d) {
+  const [l0, l1, l2] = MODELOS[S.modelo], t1 = rad(t1d), a2 = rad(t1d - t2d);
+  const j1 = l0 + l1 * Math.sin(t1) - KOFF * Math.cos(t1) + KOFF * Math.cos(a2);
+  return Math.min(j1, j1 + l2 * Math.sin(a2)) - 0.12;
+}
+const FOLGA_BLOQUEIO = 0.25, FOLGA_ESTACIONA = 0.35;     // o chão trava o movimento abaixo de 25 cm; o estacionar pede 35 cm
+// menor elevação do braço que mantém a lança fora do chão durante TODA a dobra, de t2 até a pose de transporte
+function t1Minimo(t2) {
+  for (let t1 = T1[0]; t1 <= T1[1]; t1 += 0.5) {
+    let ok = folgaChao(t1, POSE_PARK.t2) >= FOLGA_ESTACIONA;
+    for (let x = t2; ok && x < POSE_PARK.t2; x += 1) ok = folgaChao(t1, x) >= FOLGA_ESTACIONA;
+    if (ok) return t1;
+  }
+  return T1[1];
+}
+
 function passa(dt) {
   const inp = entradas(dt);
   const alvo = { g: inp.g * VEL.g, b: inp.b * VEL.b, l: inp.l * VEL.l };   // °/s desejados
@@ -289,8 +321,10 @@ function passa(dt) {
 
   // bloqueio: com alarme ligado, nenhum movimento pode ALTA a altura (o relé corta o hidráulico de subir)
   const tenta = (db, dl) => maxH(S.t1 + db, S.t2 + dl) > cur + 1e-6;
-  S.blq.b = S.alarme && S.vel.b !== 0 && tenta(S.vel.b * dt, 0);
-  S.blq.l = S.alarme && S.vel.l !== 0 && tenta(0, -S.vel.l * dt);
+  const f0 = folgaChao(S.t1, S.t2);
+  const chao = (db, dl) => { const f = folgaChao(S.t1 + db, S.t2 + dl); return f < FOLGA_BLOQUEIO && f < f0; };   // só barra o que PIORA
+  S.blq.b = (S.alarme && S.vel.b !== 0 && tenta(S.vel.b * dt, 0)) || (S.vel.b !== 0 && chao(S.vel.b * dt, 0));
+  S.blq.l = (S.alarme && S.vel.l !== 0 && tenta(0, -S.vel.l * dt)) || (S.vel.l !== 0 && chao(0, -S.vel.l * dt));
   if (S.blq.b) S.vel.b = 0;
   if (S.blq.l) S.vel.l = 0;
 
