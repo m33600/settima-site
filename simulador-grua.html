@@ -157,6 +157,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
  *   alarme se max(hCotovelo, hPonta) >= limite; histerese de 5 cm              */
 const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390], '8800LI': [1.77, 3.975, 2.795] };
 const HIST = 0.05;
+const GIRO_MAX = 210;                        // 8800LI: 420° de curso, com batente em ±210° em volta da posição de transporte
 const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
 const T1 = [3, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
 
@@ -234,7 +235,7 @@ const ROTEIRO = [
 let passo = 0, tPasso = 0;
 function entradaDemo(dt) {
   const alvo = ROTEIRO[passo];
-  const dg = -(((alvo.g - S.giro + 540) % 360) - 180);
+  const dg = -(alvo.g - S.giro);
   const sat = (e, tol) => Math.max(-1, Math.min(1, e / tol));
   const e = { g: sat(dg, 6), b: sat(alvo.t1 - S.t1, 3), l: sat(S.t2 - alvo.t2, 3) };   // lança "sobe" = reduz t2
   tPasso += dt;
@@ -257,7 +258,7 @@ function entradas(dt) {
   if (estaciona && manual) { estaciona = false; log('Estacionar cancelado'); }
   if (estaciona) {
     const A = POSE_PARK, sat = (e, tol) => Math.max(-1, Math.min(1, e / tol));
-    const dg = ((A.g - S.giro + 540) % 360) - 180;
+    const dg = A.g - S.giro;
     // primeiro baixa o braço e gira; a lança fecha por último, para não varrer o chão
     const e = { g: -sat(dg, 6), b: sat(A.t1 - S.t1, 3), l: sat(S.t2 - A.t2, 4) };
     if (Math.abs(dg) < 1.5 && Math.abs(A.t1 - S.t1) < 0.7 && Math.abs(S.t2 - A.t2) < 1.5) { estaciona = false; log('Grua estacionada'); }
@@ -279,13 +280,20 @@ function passa(dt) {
 
   // bloqueio: com alarme ligado, nenhum movimento pode ALTA a altura (o relé corta o hidráulico de subir)
   const tenta = (db, dl) => maxH(S.t1 + db, S.t2 + dl) > cur + 1e-6;
-  S.blq.g = false;
   S.blq.b = S.alarme && S.vel.b !== 0 && tenta(S.vel.b * dt, 0);
   S.blq.l = S.alarme && S.vel.l !== 0 && tenta(0, -S.vel.l * dt);
   if (S.blq.b) S.vel.b = 0;
   if (S.blq.l) S.vel.l = 0;
 
-  S.giro = (S.giro - S.vel.g * dt + 360) % 360;      // direita = horário visto de cima
+  // giro com batente: direita = horário visto de cima; nas pontas do curso de 420° a grua para
+  const ng = S.giro - S.vel.g * dt;
+  const noBatente = Math.abs(ng) >= GIRO_MAX && Math.abs(ng) > Math.abs(S.giro);
+  S.giro = Math.max(-GIRO_MAX, Math.min(GIRO_MAX, ng));
+  if (noBatente) {
+    S.vel.g = 0;
+    if (!S.blq.g) log('BATENTE do giro em ' + (S.giro > 0 ? '+' : '−') + GIRO_MAX + '°');
+  }
+  S.blq.g = noBatente;
   S.t1 = Math.max(T1[0], Math.min(T1[1], S.t1 + S.vel.b * dt));
   S.t2 = Math.max(T2[0], Math.min(T2[1], S.t2 - S.vel.l * dt));
 
@@ -542,7 +550,7 @@ function desenha() {
 const $ = id => document.getElementById(id);
 function painel() {
   const { hE, hT } = alturas();
-  $('vG').textContent = (Math.round(S.giro) % 360) + '°';
+  $('vG').textContent = (Math.round(S.giro) || 0) + '° (±' + GIRO_MAX + ')';
   $('vB').textContent = fmt(S.t1, 1) + '°';
   $('vL').textContent = fmt(S.t2, 1) + '°';
   $('vHE').textContent = fmt(hE) + ' m';
