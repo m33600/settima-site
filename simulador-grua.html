@@ -103,7 +103,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <button id="bDemo">▶ Demonstração</button>
   <button id="bVista">Vista: 3D</button>
   <button id="bSom">🔊 Som</button>
-  <button id="bBle" title="Transmite os ângulos por Bluetooth, como os sensores reais, para o tablet. Precisa da ponte local neste PC: rode  sim-ble --abrir  (ela serve esta mesma página em http://127.0.0.1:8777, sem internet)">◉ Saída BLE</button>
+  <button id="bBle" title="Manda os ângulos e a pressão para o gateway 101 simulado (rede GATEWAY-101), que o tablet mostra como se fosse a grua. Rode  sim-gateway --ap INTERFACE --abrir  neste PC e use esta mesma página em http://127.0.0.1:8101/sim">◉ Gateway 101</button>
   <button id="bTransf" class="on">◜ Transferidores</button>
   <label class="opac" title="Transparência dos transferidores">opacidade <input type="range" id="rOpac" min="5" max="100" value="100"></label>
   <button id="bTela">⛶ Tela cheia</button>
@@ -122,7 +122,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <div class="lin"><span>Altura do cotovelo</span><b id="vHE">0 m</b></div>
   <div class="lin"><span>Altura da ponta</span><b id="vHT">0 m</b></div>
   <div class="lin"><span>Pressão (simulada)</span><b id="vP">0 bar</b></div>
-  <div class="lin"><span>Saída BLE</span><b id="vBle">desligada</b></div>
+  <div class="lin"><span>Gateway 101</span><b id="vBle">desligada</b></div>
   <div class="cfg">
     <label>Modelo
       <select id="selModelo"><option>5570LI</option><option>7700LI</option><option selected>8800LI</option></select>
@@ -715,10 +715,10 @@ function aplicaOpac(v) { gTrChao.style.opacity = gTrAr.style.opacity = v / 100; 
 try { const v = localStorage.getItem('simGruaOpac'); if (v) $('rOpac').value = v; } catch (e) {}
 aplicaOpac($('rOpac').value);
 $('rOpac').oninput = e => { aplicaOpac(e.target.value); try { localStorage.setItem('simGruaOpac', e.target.value); } catch (x) {} };
-/* ============ Saída Bluetooth ============
- * A página não fala Bluetooth de periférico; quem anuncia é a ponte local (tools/sim-ble-ponte.py, comando `sim-ble`),
- * que recebe os ângulos por HTTP em 127.0.0.1 e os transmite como os sensores reais. Ver o cabeçalho da ponte. */
-const PONTE = (location.hostname === '127.0.0.1' && location.port === '8777') ? location.origin : 'http://127.0.0.1:8777';   // servida pela ponte: mesma origem, sem aviso do Chrome
+/* ============ Saída para o gateway simulado ============
+ * Quem fala com o tablet é o `sim-gateway` (tools/sim-gateway): roda o MESMO núcleo do gateway, serve a /op e cria a rede
+ * GATEWAY-101. Esta página só lhe manda, por HTTP local, o que os sensores mandariam. Ver o cabeçalho de sim-gateway.py. */
+const PONTE = (location.hostname === '127.0.0.1' && location.port === '8101') ? location.origin : 'http://127.0.0.1:8101';   // servida pelo gateway: mesma origem, sem aviso do Chrome
 let ble = false, bleTimer = null, bleErros = 0;
 function bleEstado(txt, cls) {
   $('vBle').textContent = txt; $('vBle').style.color = cls === 'ok' ? 'var(--good)' : cls === 'erro' ? 'var(--crit)' : '';
@@ -728,18 +728,19 @@ async function bleEnvia() {
   if (!ble) return;
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 800);
   try {
-    const r = await fetch(PONTE + '/', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal,
-      body: JSON.stringify({ giro: S.giro, t1: S.t1, t2: S.t2, pressao: S.pressao }) });
+    const r = await fetch(PONTE + '/sim', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal,
+      body: JSON.stringify({ giro: S.giro, t1: S.t1, t2: S.t2, pressao: S.pressao,
+                             modelo: Object.keys(MODELOS).indexOf(S.modelo), limite: S.limite, pre: S.pre }) });
     const j = await r.json(); bleErros = 0;
-    bleEstado(j.no_ar ? 'no ar (' + j.anuncios + ' sensores)' : j.erro ? 'erro: ' + j.erro : 'ligando…', j.no_ar ? 'ok' : j.erro ? 'erro' : '');
-  } catch (e) { bleErros++; bleEstado(PONTE === location.origin ? 'ponte parou — rode: sim-ble' : 'sem ponte — rode sim-ble e abra 127.0.0.1:8777', 'erro'); }
+    bleEstado(j.vivo ? 'no ar (GATEWAY-' + j.serie + ')' : 'ligando…', j.vivo ? 'ok' : '');
+  } catch (e) { bleErros++; bleEstado(PONTE === location.origin ? 'gateway parou — rode: sim-gateway' : 'sem gateway — rode: sim-gateway --abrir', 'erro'); }
   finally { clearTimeout(to); }
   if (ble) bleTimer = setTimeout(bleEnvia, bleErros ? 1000 : 100);
 }
 $('bBle').onclick = () => {
   ble = !ble; clearTimeout(bleTimer); bleErros = 0;
-  if (ble) { bleEstado('conectando…', ''); log('Saída BLE ligada'); bleEnvia(); }
-  else { bleEstado('desligada', ''); $('bBle').classList.remove('on'); log('Saída BLE desligada'); }
+  if (ble) { bleEstado('conectando…', ''); log('Saída para o gateway 101 ligada'); bleEnvia(); }
+  else { bleEstado('desligada', ''); $('bBle').classList.remove('on'); log('Saída para o gateway 101 desligada'); }
 };
 $('bTransf').onclick = () => { mostraTransf = !mostraTransf; $('bTransf').classList.toggle('on', mostraTransf); };
 $('bDemo').onclick = alternaDemo;
