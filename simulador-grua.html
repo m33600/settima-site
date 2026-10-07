@@ -162,7 +162,7 @@ const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390]
 const HIST = 0.05;
 // Giro do 8800LI: 420° de curso, simétrico em volta do zero (±210°), com batente nas duas pontas.
 // O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido no sentido anti-horário visto de cima:
-// o 0° é a lança PERPENDICULAR ao caminhão. A posição de transporte (lança sobre a cabine) lê -GIRO_ZERO.
+// o 0° é a lança PERPENDICULAR ao caminhão, e é onde o ESTACIONAR deixa o giro.
 const GIRO_ZERO = 90;
 const GIRO_LIM = [-210, 210];
 const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
@@ -193,8 +193,8 @@ function log(msg) {
 /* ============ Entradas ============ */
 const teclas = new Set();
 const pad = { L: { x: 0, y: 0 }, R: { x: 0, y: 0 } };
-let demo = false, estaciona = false;
-const POSE_PARK = { g: -GIRO_ZERO, t1: 6, t2: 178 };      // transporte: lança deitada sobre a cabine
+let demo = false, estaciona = false, faseDobra = false;
+const POSE_PARK = { g: 0, t1: 6, t2: 178 };               // transporte: giro em zero, braço baixo, lança dobrada
 
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
@@ -262,14 +262,16 @@ function entradas(dt) {
   const gp = leGamepad();
   const m = { g: kb.g + pad.L.x + gp.g, b: kb.b + pad.L.y + gp.b, l: kb.l + pad.R.y + gp.l };
   const manual = m.g || m.b || m.l;
-  if (estaciona && manual) { estaciona = false; log('Estacionar cancelado'); }
+  if (estaciona && manual) { estaciona = false; faseDobra = false; log('Estacionar cancelado'); }
   if (estaciona) {
     const A = POSE_PARK, sat = (e, tol) => Math.max(-1, Math.min(1, e / tol));
     const dg = A.g - S.giro;
-    // primeiro baixa o braço e gira; a lança fecha por último, para não varrer o chão
-    const e = { g: -sat(dg, 6), b: sat(A.t1 - S.t1, 3), l: sat(S.t2 - A.t2, 4) };
-    if (Math.abs(dg) < 1.5 && Math.abs(A.t1 - S.t1) < 0.7 && Math.abs(S.t2 - A.t2) < 1.5) { estaciona = false; log('Grua estacionada'); }
-    return { g: e.g, b: e.b, l: e.l };
+    // em duas fases: 1) gira até o zero, com braço e lança parados; 2) só então baixa o braço e dobra a lança
+    if (Math.abs(dg) > 0.7 && !faseDobra) return { g: -sat(dg, 6), b: 0, l: 0 };
+    if (!faseDobra) { faseDobra = true; log('Giro em zero — dobrando a lança'); }
+    const e = { b: sat(A.t1 - S.t1, 3), l: sat(S.t2 - A.t2, 4) };
+    if (Math.abs(A.t1 - S.t1) < 0.7 && Math.abs(S.t2 - A.t2) < 1.5) { estaciona = false; faseDobra = false; log('Grua estacionada'); }
+    return { g: -sat(dg, 6), b: e.b, l: e.l };      // o giro segue travado em zero durante a dobra
   }
   if (demo && manual) alternaDemo();                     // tocou: a demonstração larga o comando
   const r = demo ? entradaDemo(dt) : m;
@@ -671,7 +673,7 @@ function alternaDemo() {
 }
 $('bTransf').onclick = () => { mostraTransf = !mostraTransf; $('bTransf').classList.toggle('on', mostraTransf); };
 $('bDemo').onclick = alternaDemo;
-$('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; log('Estacionando…'); audioLiga(); };
+$('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; faseDobra = false; log('Estacionando…'); audioLiga(); };
 $('bSom').onclick = () => { mudo = !mudo; $('bSom').textContent = mudo ? '🔇 Mudo' : '🔊 Som'; audioLiga(); };
 $('bTela').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
 $('bVista').onclick = () => {
