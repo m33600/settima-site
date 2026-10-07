@@ -112,7 +112,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
     <div class="eixo" id="eB">BRAÇO</div>
     <div class="eixo" id="eL">LANÇA</div>
   </div>
-  <div class="lin"><span>Giro</span><b id="vG">0°</b></div>
+  <div class="lin"><span id="lG">Giro</span><b id="vG">0°</b></div>
   <div class="lin"><span>Braço (θ1)</span><b id="vB">0°</b></div>
   <div class="lin"><span>Lança (θ2)</span><b id="vL">0°</b></div>
   <div class="lin"><span>Altura do cotovelo</span><b id="vHE">0 m</b></div>
@@ -160,11 +160,16 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
  *   alarme se max(hCotovelo, hPonta) >= limite; histerese de 5 cm              */
 const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390], '8800LI': [1.77, 3.975, 2.795] };
 const HIST = 0.05;
-const GIRO_MAX = 210;                        // 8800LI: 420° de curso, com batente em ±210° em volta da posição de transporte
+// Giro do 8800LI: 420° de curso, com batente nas duas pontas.
+// O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido no sentido anti-horário visto de cima:
+// o 0° é a lança PERPENDICULAR ao caminhão. Os batentes são físicos e acompanham o zero: eram ±210° em volta
+// do rumo da cabine, agora [-300°, +120°]. Para um curso simétrico em volta do novo zero, use GIRO_LIM = [-210, 210].
+const GIRO_ZERO = 90;
+const GIRO_LIM = [-210 - GIRO_ZERO, 210 - GIRO_ZERO];
 const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
 const T1 = [3, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
 
-const S = { modelo: '8800LI', giro: 20, t1: 22, t2: 10, limite: 4.75, pre: 0.5,
+const S = { modelo: '8800LI', giro: -70, t1: 22, t2: 10, limite: 4.75, pre: 0.5,
             alarme: false, pregao: false, pressao: 1.8, vel: { g: 0, b: 0, l: 0 }, blq: { g: false, b: false, l: false } };
 const rad = d => d * Math.PI / 180;
 const fmt = (v, n = 2) => v.toFixed(n).replace('.', ',');
@@ -190,7 +195,7 @@ function log(msg) {
 const teclas = new Set();
 const pad = { L: { x: 0, y: 0 }, R: { x: 0, y: 0 } };
 let demo = false, estaciona = false;
-const POSE_PARK = { g: 0, t1: 6, t2: 178 };
+const POSE_PARK = { g: -GIRO_ZERO, t1: 6, t2: 178 };      // transporte: lança deitada sobre a cabine
 
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
@@ -232,8 +237,8 @@ function leGamepad() {
 
 /* Demonstração: dirige a grua sozinha por poses, passando do limite de propósito */
 const ROTEIRO = [
-  { g: 40, t1: 30, t2: 10 }, { g: 95, t1: 62, t2: 2 }, { g: -30, t1: 25, t2: 45 },
-  { g: -80, t1: 55, t2: 3 }, { g: 0, t1: 20, t2: 20 },
+  { g: -50, t1: 30, t2: 10 }, { g: 5, t1: 62, t2: 2 }, { g: -120, t1: 25, t2: 45 },
+  { g: -170, t1: 55, t2: 3 }, { g: -90, t1: 20, t2: 20 },
 ];
 let passo = 0, tPasso = 0;
 function entradaDemo(dt) {
@@ -290,11 +295,11 @@ function passa(dt) {
 
   // giro com batente: direita = horário visto de cima; nas pontas do curso de 420° a grua para
   const ng = S.giro - S.vel.g * dt;
-  const noBatente = Math.abs(ng) >= GIRO_MAX && Math.abs(ng) > Math.abs(S.giro);
-  S.giro = Math.max(-GIRO_MAX, Math.min(GIRO_MAX, ng));
+  const noBatente = (ng <= GIRO_LIM[0] && ng < S.giro) || (ng >= GIRO_LIM[1] && ng > S.giro);
+  S.giro = Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], ng));
   if (noBatente) {
     S.vel.g = 0;
-    if (!S.blq.g) log('BATENTE do giro em ' + (S.giro > 0 ? '+' : '−') + GIRO_MAX + '°');
+    if (!S.blq.g) log('BATENTE do giro em ' + (S.giro > 0 ? '+' : '−') + Math.abs(Math.round(S.giro)) + '°');
   }
   S.blq.g = noBatente;
   S.t1 = Math.max(T1[0], Math.min(T1[1], S.t1 + S.vel.b * dt));
@@ -455,7 +460,7 @@ function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
 function constroi() {
   const [l0, l1, l2] = MODELOS[S.modelo];
   const f = [];
-  const psi = rad(S.giro), t1 = rad(S.t1), a2 = rad(S.t1 - S.t2);
+  const psi = rad(S.giro + GIRO_ZERO), t1 = rad(S.t1), a2 = rad(S.t1 - S.t2);
   const AM = [226, 164, 28], LA = [222, 128, 30], CZ = [150, 155, 150], PT = [38, 40, 36], CH = [72, 80, 86];
 
   // caminhão
@@ -559,18 +564,22 @@ function transferidor(c, e1, e2, r, a0, a1, cur, lim, rot, passoRot, ref = 0, om
 
 function desenhaTransf(P0, P1) {
   if (!mostraTransf) { gTrChao.innerHTML = gTrAr.innerHTML = ''; return; }
-  const psi = rad(S.giro), t1 = rad(S.t1);
-  const X = [1, 0, 0], Yv = [0, 1, 0], O = [0, 0, 0.03];
-  // giro: anel no chão, 0° ao longo de +x, positivo = anti-horário visto de cima; as pontas além de ±180° vão num anel externo
+  const psi = rad(S.giro + GIRO_ZERO), t1 = rad(S.t1);
+  const zr = rad(GIRO_ZERO), X = [Math.cos(zr), Math.sin(zr), 0], Yv = [-Math.sin(zr), Math.cos(zr), 0], O = [0, 0, 0.03];   // 0° do anel = zero do giro
+  // giro: anel no chão, 0° no zero do giro, positivo = anti-horário visto de cima; as pontas além de ±180° vão num anel externo
   const Rg = 5.0;
-  let g = transferidor(O, X, Yv, Rg, -180, 180, S.giro, [-GIRO_MAX, GIRO_MAX], 'GIRO', 30, 0, [180]);
-  for (const [a0, a1] of [[180, GIRO_MAX], [-GIRO_MAX, -180]]) {
+  let g = transferidor(O, X, Yv, Rg, -180, 180, S.giro, GIRO_LIM, 'GIRO', 30, 0, [180]);
+  const extras = [];
+  if (GIRO_LIM[1] > 180) extras.push([180, GIRO_LIM[1]]);
+  if (GIRO_LIM[0] < -180) extras.push([GIRO_LIM[0], -180]);
+  for (const [a0, a1] of extras) {
     g += `<polyline points="${poli(O, X, Yv, Rg + 0.7, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".55" stroke-width="1.6"/>`;
     for (let a = a0; a <= a1; a += 5) {
       const mai = a % 30 === 0;
       g += lin3(arc3(O, X, Yv, Rg + 0.7, a), arc3(O, X, Yv, Rg + 0.7 - (mai ? 0.24 : 0.1), a), CI, mai ? 1.6 : 1, .7);
-      if ((a % 30 === 0 && Math.abs(a) !== 180) || Math.abs(a) === GIRO_MAX) g += txt(arc3(O, X, Yv, Rg + 1.1, a), a);
+      if ((a % 30 === 0 && Math.abs(a) !== 180) || GIRO_LIM.includes(a)) g += txt(arc3(O, X, Yv, Rg + 1.1, a), a);
     }
+    for (const a of GIRO_LIM) if (a >= a0 && a <= a1) g += lin3(arc3(O, X, Yv, Rg + 0.36, a), arc3(O, X, Yv, Rg + 0.84, a), VM, 3, .95);   // batente no anel externo
   }
   gTrChao.innerHTML = g;
 
@@ -578,10 +587,10 @@ function desenhaTransf(P0, P1) {
   const h = [Math.cos(psi), Math.sin(psi), 0], Z = [0, 0, 1];
   const dB = [Math.cos(t1) * h[0], Math.cos(t1) * h[1], Math.sin(t1)];
   const nB = [-Math.sin(t1) * h[0], -Math.sin(t1) * h[1], Math.cos(t1)];
-  let a = transferidor(P0, h, Z, 2.7, 0, 90, S.t1, T1, 'BRAÇO', 30, 0, [], 90);
-  a += lin3(P0, add(P0, mul(h, 3.2)), CI, 1, .5, '5 6');                 // horizontal de referência
+  let a = transferidor(P0, h, Z, 1.7, 0, 90, S.t1, T1, 'BRAÇO', 30, 0, [], 90);
+  a += lin3(P0, add(P0, mul(h, 2.3)), CI, 1, .5, '5 6');                 // horizontal de referência
   const down = mul(nB, -1);
-  a += transferidor(P1, dB, down, 1.6, 0, 180, S.t2, T2, 'LANÇA', 30, 0, [], 90);
+  a += transferidor(P1, dB, down, 1.5, 0, 180, S.t2, T2, 'LANÇA', 30, 0, [], 90);
   a += lin3(P1, add(P1, mul(dB, 2.3)), CI, 1, .5, '5 6');                 // prolongamento do braço (0° da lança)
   gTrAr.innerHTML = a;
 }
@@ -635,7 +644,7 @@ function desenha() {
 const $ = id => document.getElementById(id);
 function painel() {
   const { hE, hT } = alturas();
-  $('vG').textContent = (Math.round(S.giro) || 0) + '° (±' + GIRO_MAX + ')';
+  $('vG').textContent = (Math.round(S.giro) || 0) + '°';
   $('vB').textContent = fmt(S.t1, 1) + '°';
   $('vL').textContent = fmt(S.t2, 1) + '°';
   $('vHE').textContent = fmt(hE) + ' m';
@@ -672,7 +681,7 @@ $('bVista').onclick = () => {
 $('selModelo').onchange = e => { S.modelo = e.target.value; log('Modelo ' + S.modelo); };
 $('selPre').onchange = e => { S.pre = +e.target.value; };
 $('inLim').onchange = e => { const v = +e.target.value; if (v >= 2 && v <= 9) S.limite = v; e.target.value = S.limite; log('Limite ' + fmt(S.limite) + ' m'); };
-$('bZera').onclick = () => { Object.assign(S, { giro: 0, t1: 3, t2: 0 }); S.alarme = S.pregao = false; log('Grua zerada'); };
+$('bZera').onclick = () => { Object.assign(S, { giro: POSE_PARK.g, t1: 3, t2: 0 }); S.alarme = S.pregao = false; log('Grua zerada'); };
 $('ensinar').onclick = () => {
   const h = maxH(S.t1, S.t2), [l0] = MODELOS[S.modelo];
   if (h < l0 + 0.5) { log('Recusado: pose baixa demais'); return; }
@@ -700,6 +709,7 @@ function quadro(agora) {
   passa(dt); buzzer(agora / 1000); desenha(); painel();
   requestAnimationFrame(quadro);
 }
+$('lG').textContent = 'Giro (curso ' + GIRO_LIM[0] + '…+' + GIRO_LIM[1] + ')';
 log('Simulador pronto');
 requestAnimationFrame(quadro);
 </script>
