@@ -86,8 +86,10 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   </defs>
   <rect x="-2000" y="-2000" width="5600" height="5000" fill="url(#ceu)"/>
   <g id="chao"></g>
+  <g id="trChao"></g>
   <g id="sombra"></g>
   <g id="obj"></g>
+  <g id="trAr"></g>
   <g id="teto"></g>
   <g id="rot"></g>
 </svg>
@@ -99,6 +101,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <button id="bDemo">▶ Demonstração</button>
   <button id="bVista">Vista: 3D</button>
   <button id="bSom">🔊 Som</button>
+  <button id="bTransf" class="on">◜ Transferidores</button>
   <button id="bTela">⛶ Tela cheia</button>
 </header>
 
@@ -332,10 +335,10 @@ function buzzer(agora) {
 }
 
 /* ============ 3D ============ */
-const cam = { az: rad(-38), el: rad(17), D: 17, alvo: [0.5, 0, 2.3] };
+const cam = { az: rad(-38), el: rad(19), D: 19, alvo: [0.8, 0, 2.2] };
 const F = 1350, CX = 800, CY = 470;
 const VISTAS = [
-  { n: '3D', az: -38, el: 17 }, { n: 'Lateral', az: 0, el: 3 }, { n: 'Cima', az: 0, el: 89 }, { n: 'Frente', az: 90, el: 3 },
+  { n: '3D', az: -38, el: 19 }, { n: 'Lateral', az: 0, el: 3 }, { n: 'Cima', az: 0, el: 89 }, { n: 'Frente', az: 90, el: 3 },
 ];
 let vistaI = 0;
 
@@ -392,6 +395,7 @@ const loc = (ang, x, y, z) => [x*Math.cos(ang) - y*Math.sin(ang), x*Math.sin(ang
  * uma biela (B→R) liga o balancim à lança. A posição de B sai da interseção de dois círculos
  * (balancim × biela) e o cilindro estica ou encolhe sozinho conforme o ângulo da lança.
  * Coordenadas (u,w): u ao longo do braço a partir do pivô, w perpendicular (para cima).   */
+const MOSTRA_PISTAO = false;   // o pistão do joelho fica escondido por enquanto; mude para true para devolvê-lo
 const KOFF = 0.30;
 const KN = { Qu: -0.70, Qw: 0.22, Cu: 0.35, b: 0.80, a: 0.95, abre: 125, r: 1.10, rs: 0.80, rh: 0.20, Y: 0.20 };
 let thB = rad(40);
@@ -429,21 +433,23 @@ function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
   // (±Y), então nada atravessa o braço nem a lança, nem com ela dobrada por baixo.
   const up = [Math.sin(t2), Math.cos(t2)], Jr = [R[0] - KN.rh * up[0], R[1] - KN.rh * up[1]];
   viga(f, P([Q[0], 0], 0), P(Q, 0), 0.09, 0.09, PN);                  // cavalete do pivô do balancim, sobre o braço
-  viga(f, P([C[0], 0], 0), P(C, 0), 0.09, 0.09, PN);                  // base do pistão, sobre o braço
+  if (MOSTRA_PISTAO) viga(f, P([C[0], 0], 0), P(C, 0), 0.09, 0.09, PN);   // base do pistão, sobre o braço
   viga(f, P(Jr, 0), P(R, 0), 0.09, 0.09, PN);                          // cavalete da biela, na lança
   viga(f, P(Q, -Y), P(Q, Y), 0.09, 0.09, PN);                          // pinos que atravessam as placas
   viga(f, P(R, -Y), P(R, Y), 0.09, 0.09, PN);
-  viga(f, P(A, -Y), P(A, Y), 0.09, 0.09, PN);
+  if (MOSTRA_PISTAO) viga(f, P(A, -Y), P(A, Y), 0.09, 0.09, PN);
   for (const y of [-Y, Y]) {
     viga(f, P(Q, y), P(B, y), 0.06, 0.13, AC);
     viga(f, P(Q, y), P(A, y), 0.06, 0.13, AC);
     viga(f, P(B, y), P(R, y), 0.05, 0.09, BI);
     for (const q of [Q, B, R]) viga(f, P(q, y - 0.03), P(q, y + 0.03), 0.14, 0.14, PN);   // olhais
   }
-  const mid = [(C[0] + A[0]) / 2, (C[1] + A[1]) / 2];
-  viga(f, P(C, 0), P(mid, 0), 0.12, 0.16, CZ);                         // camisa do pistão
-  viga(f, P(mid, 0), P(A, 0), 0.06, 0.09, [215, 218, 210]);            // haste
-  for (const q of [C, A]) viga(f, P(q, -0.07), P(q, 0.07), 0.14, 0.14, PN);
+  if (MOSTRA_PISTAO) {
+    const mid = [(C[0] + A[0]) / 2, (C[1] + A[1]) / 2];
+    viga(f, P(C, 0), P(mid, 0), 0.12, 0.16, CZ);                         // camisa do pistão
+    viga(f, P(mid, 0), P(A, 0), 0.06, 0.09, [215, 218, 210]);            // haste
+    for (const q of [C, A]) viga(f, P(q, -0.07), P(q, 0.07), 0.14, 0.14, PN);
+  }
 }
 
 function constroi() {
@@ -500,12 +506,89 @@ function constroi() {
 
 const NS = 'http://www.w3.org/2000/svg';
 const gChao = document.getElementById('chao'), gSombra = document.getElementById('sombra'),
-      gObj = document.getElementById('obj'), gTeto = document.getElementById('teto'), gRot = document.getElementById('rot');
+      gObj = document.getElementById('obj'), gTeto = document.getElementById('teto'), gRot = document.getElementById('rot'),
+      gTrChao = document.getElementById('trChao'), gTrAr = document.getElementById('trAr');
 const pt = p => p[0].toFixed(1) + ',' + p[1].toFixed(1);
+
+
+/* ============ Transferidores (HUD) ============
+ * Um transferidor em cada plano de movimento: giro (no chão), braço (no plano vertical do braço)
+ * e lança (no plano do braço, centrado no joelho, medido a partir do prolongamento do braço). */
+let mostraTransf = true;
+const CI = '#5FE3FF', CIV = '#C9F8FF', VM = '#FF6B5B';
+const arc3 = (c, e1, e2, r, a) => { const A = rad(a); return [0, 1, 2].map(i => c[i] + r * (Math.cos(A) * e1[i] + Math.sin(A) * e2[i])); };
+const P2s = p => { const q = proj(p); return q[0].toFixed(1) + ',' + q[1].toFixed(1); };
+function poli(c, e1, e2, r, a0, a1, passo = 2) {
+  const n = Math.max(1, Math.ceil(Math.abs(a1 - a0) / passo)), pts = [];
+  for (let i = 0; i <= n; i++) pts.push(P2s(arc3(c, e1, e2, r, a0 + (a1 - a0) * i / n)));
+  return pts.join(' ');
+}
+const txt = (p, t, o = {}) => { const q = proj(p);
+  return `<text x="${q[0].toFixed(0)}" y="${(q[1] + (o.dy ?? 4)).toFixed(0)}" fill="${o.cor || CI}" fill-opacity="${o.op ?? .85}" font-size="${o.fs || 13}" text-anchor="${o.anc || 'middle'}" font-family="IBM Plex Mono, monospace" stroke="#0A0F14" stroke-width="3.5" paint-order="stroke">${t}</text>`; };
+const lin3 = (a, b, cor, sw, op, dash = '') => { const A = proj(a), B = proj(b);
+  return `<line x1="${A[0].toFixed(1)}" y1="${A[1].toFixed(1)}" x2="${B[0].toFixed(1)}" y2="${B[1].toFixed(1)}" stroke="${cor}" stroke-width="${sw}" stroke-opacity="${op}"${dash ? ` stroke-dasharray="${dash}"` : ''} stroke-linecap="round"/>`; };
+
+/* c: centro; e1: direção do ângulo 0; e2: sentido em que o ângulo cresce; [a0,a1]: faixa desenhada;
+ * cur: ângulo atual; lim: [min,max] do curso; rot: rótulo; rotulo a cada `passoRot` graus */
+function transferidor(c, e1, e2, r, a0, a1, cur, lim, rot, passoRot, ref = 0, omite = [], aRot = null) {
+  let o = '';
+  o += `<polyline points="${poli(c, e1, e2, r, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".55" stroke-width="1.6"/>`;
+  o += `<polyline points="${poli(c, e1, e2, r - 0.07, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".18" stroke-width="1"/>`;
+  for (let a = Math.ceil(a0 / 5) * 5; a <= a1; a += 5) {
+    const mai = a % 30 === 0, med = a % 10 === 0, ln = mai ? 0.24 : med ? 0.15 : 0.08;
+    o += lin3(arc3(c, e1, e2, r, a), arc3(c, e1, e2, r - ln, a), CI, mai ? 1.6 : 1, mai ? .85 : .5);
+    if (a % passoRot === 0 && !omite.includes(a)) o += txt(arc3(c, e1, e2, r + 0.34, a), a);
+  }
+  // fim de curso (batentes)
+  for (const a of lim) if (a >= a0 && a <= a1) o += lin3(arc3(c, e1, e2, r - 0.34, a), arc3(c, e1, e2, r + 0.14, a), VM, 3, .95);
+  // arco varrido + ponteiro
+  const bate = cur <= lim[0] + 0.05 || cur >= lim[1] - 0.05, cor = bate ? VM : CIV;
+  if (Math.abs(cur - ref) > 0.2) {
+    o += `<polyline points="${poli(c, e1, e2, r - 0.14, ref, cur)}" fill="none" stroke="${cor}" stroke-opacity=".22" stroke-width="9" stroke-linecap="round"/>`;
+    o += `<polyline points="${poli(c, e1, e2, r - 0.14, ref, cur)}" fill="none" stroke="${cor}" stroke-opacity=".95" stroke-width="2.4" stroke-linecap="round"/>`;
+  }
+  const tip = arc3(c, e1, e2, r + 0.12, cur);
+  o += lin3(c, tip, cor, 2, .9);
+  const q = proj(tip);
+  o += `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="4.5" fill="${cor}"/>`;
+  o += txt(arc3(c, e1, e2, r + 0.8, aRot ?? cur), `${rot} ${fmt(cur, 1)}°`, { cor, op: 1, fs: 16, dy: 5 });
+  const qc = proj(c);
+  o += `<circle cx="${qc[0].toFixed(1)}" cy="${qc[1].toFixed(1)}" r="3.5" fill="none" stroke="${CI}" stroke-width="1.5"/>`;
+  return o;
+}
+
+function desenhaTransf(P0, P1) {
+  if (!mostraTransf) { gTrChao.innerHTML = gTrAr.innerHTML = ''; return; }
+  const psi = rad(S.giro), t1 = rad(S.t1);
+  const X = [1, 0, 0], Yv = [0, 1, 0], O = [0, 0, 0.03];
+  // giro: anel no chão, 0° ao longo de +x, positivo = anti-horário visto de cima; as pontas além de ±180° vão num anel externo
+  const Rg = 5.0;
+  let g = transferidor(O, X, Yv, Rg, -180, 180, S.giro, [-GIRO_MAX, GIRO_MAX], 'GIRO', 30, 0, [180]);
+  for (const [a0, a1] of [[180, GIRO_MAX], [-GIRO_MAX, -180]]) {
+    g += `<polyline points="${poli(O, X, Yv, Rg + 0.7, a0, a1)}" fill="none" stroke="${CI}" stroke-opacity=".55" stroke-width="1.6"/>`;
+    for (let a = a0; a <= a1; a += 5) {
+      const mai = a % 30 === 0;
+      g += lin3(arc3(O, X, Yv, Rg + 0.7, a), arc3(O, X, Yv, Rg + 0.7 - (mai ? 0.24 : 0.1), a), CI, mai ? 1.6 : 1, .7);
+      if ((a % 30 === 0 && Math.abs(a) !== 180) || Math.abs(a) === GIRO_MAX) g += txt(arc3(O, X, Yv, Rg + 1.1, a), a);
+    }
+  }
+  gTrChao.innerHTML = g;
+
+  // braço e lança: no plano vertical da lança (azimute = giro)
+  const h = [Math.cos(psi), Math.sin(psi), 0], Z = [0, 0, 1];
+  const dB = [Math.cos(t1) * h[0], Math.cos(t1) * h[1], Math.sin(t1)];
+  const nB = [-Math.sin(t1) * h[0], -Math.sin(t1) * h[1], Math.cos(t1)];
+  let a = transferidor(P0, h, Z, 2.7, 0, 90, S.t1, T1, 'BRAÇO', 30, 0, [], 90);
+  a += lin3(P0, add(P0, mul(h, 3.2)), CI, 1, .5, '5 6');                 // horizontal de referência
+  const down = mul(nB, -1);
+  a += transferidor(P1, dB, down, 1.6, 0, 180, S.t2, T2, 'LANÇA', 30, 0, [], 90);
+  a += lin3(P1, add(P1, mul(dB, 2.3)), CI, 1, .5, '5 6');                 // prolongamento do braço (0° da lança)
+  gTrAr.innerHTML = a;
+}
 
 function desenha() {
   preparaCamera();
-  const { f, P1, P2 } = constroi();
+  const { f, P0, P1, P2 } = constroi();
 
   // chão
   let s = '';
@@ -520,6 +603,8 @@ function desenha() {
   // sombra do braço e da lança no chão (dá a noção de altura)
   const q0 = proj([0, 0, 0]), q1 = proj([P1[0], P1[1], 0]), q2 = proj([P2[0], P2[1], 0]);
   gSombra.innerHTML = `<polyline points="${pt(q0)} ${pt(q1)} ${pt(q2)}" fill="none" stroke="#000" stroke-opacity=".45" stroke-width="10" stroke-linejoin="round" stroke-linecap="round"/>`;
+
+  desenhaTransf(P0, P1);
 
   // objetos (algoritmo do pintor)
   f.sort((a, b) => b.z - a.z);
@@ -574,6 +659,7 @@ function alternaDemo() {
   log(demo ? 'Demonstração ligada' : 'Demonstração parada');
   audioLiga();
 }
+$('bTransf').onclick = () => { mostraTransf = !mostraTransf; $('bTransf').classList.toggle('on', mostraTransf); };
 $('bDemo').onclick = alternaDemo;
 $('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; log('Estacionando…'); audioLiga(); };
 $('bSom').onclick = () => { mudo = !mudo; $('bSom').textContent = mudo ? '🔇 Mudo' : '🔊 Som'; audioLiga(); };
