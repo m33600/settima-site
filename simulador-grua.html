@@ -103,6 +103,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <button id="bDemo">▶ Demonstração</button>
   <button id="bVista">Vista: 3D</button>
   <button id="bSom">🔊 Som</button>
+  <button id="bBle" title="Transmite os ângulos por Bluetooth, como os sensores reais, para o tablet. Precisa da ponte local neste PC: rode  sim-ble">◉ Saída BLE</button>
   <button id="bTransf" class="on">◜ Transferidores</button>
   <label class="opac" title="Transparência dos transferidores">opacidade <input type="range" id="rOpac" min="5" max="100" value="100"></label>
   <button id="bTela">⛶ Tela cheia</button>
@@ -121,6 +122,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <div class="lin"><span>Altura do cotovelo</span><b id="vHE">0 m</b></div>
   <div class="lin"><span>Altura da ponta</span><b id="vHT">0 m</b></div>
   <div class="lin"><span>Pressão (simulada)</span><b id="vP">0 bar</b></div>
+  <div class="lin"><span>Saída BLE</span><b id="vBle">desligada</b></div>
   <div class="cfg">
     <label>Modelo
       <select id="selModelo"><option>5570LI</option><option>7700LI</option><option selected>8800LI</option></select>
@@ -169,7 +171,7 @@ const HIST = 0.05;
 const GIRO_ZERO = 90;
 const GIRO_LIM = [-210, 210];
 const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
-const T1 = [3, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
+const T1 = [0, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
 
 const S = { modelo: '8800LI', giro: -70, t1: 22, t2: 10, limite: 4.75, pre: 0.5,
             alarme: false, pregao: false, pressao: 1.8, vel: { g: 0, b: 0, l: 0 }, blq: { g: false, b: false, l: false } };
@@ -713,6 +715,32 @@ function aplicaOpac(v) { gTrChao.style.opacity = gTrAr.style.opacity = v / 100; 
 try { const v = localStorage.getItem('simGruaOpac'); if (v) $('rOpac').value = v; } catch (e) {}
 aplicaOpac($('rOpac').value);
 $('rOpac').oninput = e => { aplicaOpac(e.target.value); try { localStorage.setItem('simGruaOpac', e.target.value); } catch (x) {} };
+/* ============ Saída Bluetooth ============
+ * A página não fala Bluetooth de periférico; quem anuncia é a ponte local (tools/sim-ble-ponte.py, comando `sim-ble`),
+ * que recebe os ângulos por HTTP em 127.0.0.1 e os transmite como os sensores reais. Ver o cabeçalho da ponte. */
+const PONTE = 'http://127.0.0.1:8777';
+let ble = false, bleTimer = null, bleErros = 0;
+function bleEstado(txt, cls) {
+  $('vBle').textContent = txt; $('vBle').style.color = cls === 'ok' ? 'var(--good)' : cls === 'erro' ? 'var(--crit)' : '';
+  $('bBle').classList.toggle('on', ble && cls === 'ok');
+}
+async function bleEnvia() {
+  if (!ble) return;
+  const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 800);
+  try {
+    const r = await fetch(PONTE + '/', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal,
+      body: JSON.stringify({ giro: S.giro, t1: S.t1, t2: S.t2, pressao: S.pressao }) });
+    const j = await r.json(); bleErros = 0;
+    bleEstado(j.no_ar ? 'no ar (' + j.anuncios + ' sensores)' : j.erro ? 'erro: ' + j.erro : 'ligando…', j.no_ar ? 'ok' : j.erro ? 'erro' : '');
+  } catch (e) { bleErros++; bleEstado('ponte offline — rode: sim-ble', 'erro'); }
+  finally { clearTimeout(to); }
+  if (ble) bleTimer = setTimeout(bleEnvia, bleErros ? 1000 : 100);
+}
+$('bBle').onclick = () => {
+  ble = !ble; clearTimeout(bleTimer); bleErros = 0;
+  if (ble) { bleEstado('conectando…', ''); log('Saída BLE ligada'); bleEnvia(); }
+  else { bleEstado('desligada', ''); $('bBle').classList.remove('on'); log('Saída BLE desligada'); }
+};
 $('bTransf').onclick = () => { mostraTransf = !mostraTransf; $('bTransf').classList.toggle('on', mostraTransf); };
 $('bDemo').onclick = alternaDemo;
 $('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; faseDobra = false; log('Estacionando…'); audioLiga(); };
@@ -726,7 +754,8 @@ $('bVista').onclick = () => {
 $('selModelo').onchange = e => { S.modelo = e.target.value; log('Modelo ' + S.modelo); };
 $('selPre').onchange = e => { S.pre = +e.target.value; };
 $('inLim').onchange = e => { const v = +e.target.value; if (v >= 2 && v <= 9) S.limite = v; e.target.value = S.limite; log('Limite ' + fmt(S.limite) + ' m'); };
-$('bZera').onclick = () => { Object.assign(S, { giro: POSE_PARK.g, t1: 3, t2: 0 }); S.alarme = S.pregao = false; log('Grua zerada'); };
+// Zerar grua = horizontal: braço 0° e lança colinear, a pose em que o tablet pede o ZERAR
+$('bZera').onclick = () => { Object.assign(S, { giro: POSE_PARK.g, t1: 0, t2: 0 }); S.alarme = S.pregao = false; log('Grua zerada'); };
 $('ensinar').onclick = () => {
   const h = maxH(S.t1, S.t2), [l0] = MODELOS[S.modelo];
   if (h < l0 + 0.5) { log('Recusado: pose baixa demais'); return; }
