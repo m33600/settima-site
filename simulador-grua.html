@@ -385,7 +385,7 @@ const loc = (ang, x, y, z) => [x*Math.cos(ang) - y*Math.sin(ang), x*Math.sin(ang
  * (balancim × biela) e o cilindro estica ou encolhe sozinho conforme o ângulo da lança.
  * Coordenadas (u,w): u ao longo do braço a partir do pivô, w perpendicular (para cima).   */
 const KOFF = 0.30;
-const KN = { Qu: -0.70, Qw: 0.22, Cu: 0.35, b: 0.80, a: 0.95, abre: 125, r: 1.10, rs: 0.80, rh: 0.20, Y: 0.34 };
+const KN = { Qu: -0.70, Qw: 0.22, Cu: 0.35, b: 0.80, a: 0.95, abre: 125, r: 1.10, rs: 0.80, rh: 0.20, Y: 0.20 };
 let thB = rad(40);
 const Rjib = (t2) => [KOFF * Math.sin(t2) + KN.rs * Math.cos(t2) + KN.rh * Math.sin(t2),
                       -KOFF + KOFF * Math.cos(t2) - KN.rs * Math.sin(t2) + KN.rh * Math.cos(t2)];   // relativo ao fim do braço
@@ -416,18 +416,26 @@ function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
 
   // bloco do joelho: carcaça no fim do braço + pino atravessando até a lança e as placas
   viga(f, to3(l1 - 0.35, -0.12, 0), to3(l1 + 0.02, -0.12, 0), 0.4, 0.62, [170, 120, 24]);
-  viga(f, to3(l1, -KOFF, -0.15), to3(l1, -KOFF, Y + 0.12), 0.16, 0.16, PN);
-  // pinos laterais ligando o braço e a lança ao plano do mecanismo
-  for (const q of [Q, C]) viga(f, P(q, 0), P(q, Y), 0.09, 0.09, PN);
-  viga(f, P(R, 0), P(R, Y), 0.09, 0.09, PN);
-  // balancim (duas pernas) + biela + cilindro
-  viga(f, P(Q), P(B), 0.07, 0.13, AC);
-  viga(f, P(Q), P(A), 0.07, 0.13, AC);
-  viga(f, P(B), P(R), 0.05, 0.08, BI);
+  viga(f, to3(l1, -KOFF, -Y - 0.12), to3(l1, -KOFF, Y + 0.12), 0.16, 0.16, PN);
+  // O pistão fica CENTRADO, por cima do braço. Balancim e biela são placas duplas, uma de cada lado do braço
+  // (±Y), então nada atravessa o braço nem a lança, nem com ela dobrada por baixo.
+  const up = [Math.sin(t2), Math.cos(t2)], Jr = [R[0] - KN.rh * up[0], R[1] - KN.rh * up[1]];
+  viga(f, P([Q[0], 0], 0), P(Q, 0), 0.09, 0.09, PN);                  // cavalete do pivô do balancim, sobre o braço
+  viga(f, P([C[0], 0], 0), P(C, 0), 0.09, 0.09, PN);                  // base do pistão, sobre o braço
+  viga(f, P(Jr, 0), P(R, 0), 0.09, 0.09, PN);                          // cavalete da biela, na lança
+  viga(f, P(Q, -Y), P(Q, Y), 0.09, 0.09, PN);                          // pinos que atravessam as placas
+  viga(f, P(R, -Y), P(R, Y), 0.09, 0.09, PN);
+  viga(f, P(A, -Y), P(A, Y), 0.09, 0.09, PN);
+  for (const y of [-Y, Y]) {
+    viga(f, P(Q, y), P(B, y), 0.06, 0.13, AC);
+    viga(f, P(Q, y), P(A, y), 0.06, 0.13, AC);
+    viga(f, P(B, y), P(R, y), 0.05, 0.09, BI);
+    for (const q of [Q, B, R]) viga(f, P(q, y - 0.03), P(q, y + 0.03), 0.14, 0.14, PN);   // olhais
+  }
   const mid = [(C[0] + A[0]) / 2, (C[1] + A[1]) / 2];
-  viga(f, P(C), P(mid), 0.07, 0.16, CZ);
-  viga(f, P(mid), P(A), 0.05, 0.09, [215, 218, 210]);
-  for (const q of [Q, A, B, C]) viga(f, P(q, Y - 0.05), P(q, Y + 0.06), 0.14, 0.14, PN);   // olhais dos pinos
+  viga(f, P(C, 0), P(mid, 0), 0.12, 0.16, CZ);                         // camisa do pistão
+  viga(f, P(mid, 0), P(A, 0), 0.06, 0.09, [215, 218, 210]);            // haste
+  for (const q of [C, A]) viga(f, P(q, -0.07), P(q, 0.07), 0.14, 0.14, PN);
 }
 
 function constroi() {
