@@ -778,14 +778,24 @@ addEventListener('pointerup', () => drag = null);
 cena.addEventListener('wheel', e => { e.preventDefault(); cam.D = Math.max(8, Math.min(30, cam.D * (1 + Math.sign(e.deltaY) * 0.08))); }, { passive: false });
 
 /* ============ Laço ============ */
-let tAnt = performance.now();
+let tAnt = performance.now(), tDesenho = 0;
+// ?fps=15 limita quantos quadros por segundo são DESENHADOS. Sem o parâmetro NADA muda: desenha a cada quadro do navegador e
+// o passo da física segue limitado a 50 ms. Em PC fraco o desenho em SVG é o que pesa (medido num MacBook 2012: o Firefox a
+// 60 fps usava 170% de CPU e a saída para o gateway caía para ~5 quadros/s); com o limite a física passa a seguir o tempo
+// real (passo de até 200 ms) e a grua não fica em câmera lenta.
+const PARAM_FPS = parseFloat(new URLSearchParams(location.search).get('fps'));
+const FPS_MAX = PARAM_FPS > 0 ? Math.min(60, Math.max(5, PARAM_FPS)) : Infinity;
+const DT_MAX = PARAM_FPS > 0 ? 0.2 : 0.05;
 function quadro(agora) {
-  const dt = Math.min(0.05, (agora - tAnt) / 1000); tAnt = agora;
-  passa(dt); buzzer(agora / 1000); desenha(); painel();
+  const dt = Math.min(DT_MAX, (agora - tAnt) / 1000); tAnt = agora;
+  passa(dt); buzzer(agora / 1000);
+  if (agora - tDesenho >= 1000 / FPS_MAX - 2) { tDesenho = agora; desenha(); painel(); }
   requestAnimationFrame(quadro);
 }
 $('lG').textContent = 'Giro (curso ' + GIRO_LIM[0] + '…+' + GIRO_LIM[1] + ')';
 log('Simulador pronto');
+// ?gateway=1 no endereço liga a saída para o gateway 101 sozinha (feira: ninguém precisa clicar)
+if (new URLSearchParams(location.search).has('gateway')) $('bBle').click();
 requestAnimationFrame(quadro);
 </script>
 </body>
