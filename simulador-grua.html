@@ -122,10 +122,11 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <div class="lin"><span>Altura do cotovelo</span><b id="vHE">0 m</b></div>
   <div class="lin"><span>Altura da ponta</span><b id="vHT">0 m</b></div>
   <div class="lin"><span>Pressão (simulada)</span><b id="vP">0 bar</b></div>
+  <div class="lin" id="linCap" style="display:none"><span>Alcance · capacidade</span><b id="vCap">—</b></div>
   <div class="lin"><span>Gateway 101</span><b id="vBle">desligada</b></div>
   <div class="cfg">
     <label>Modelo
-      <select id="selModelo"><option>5570LI</option><option>7700LI</option><option selected>8800LI</option></select>
+      <select id="selModelo"><option>5570LI</option><option>7700LI</option><option selected>8800LI</option><option value="TITAN6700">TITAN 6700</option></select>
     </label>
     <label>Pré-aviso (m)
       <select id="selPre"><option value="0">desligado</option><option value="0.25">0,25</option><option value="0.5" selected>0,50</option><option value="1">1,00</option></select>
@@ -163,13 +164,18 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
  *   hCotovelo = l0 + l1*sin(t1)
  *   hPonta    = l0 + l1*sin(t1) + l2*sin(t1 - t2)
  *   alarme se max(hCotovelo, hPonta) >= limite; histerese de 5 cm              */
-const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390], '8800LI': [1.77, 3.975, 2.795] };
+// TITAN 6700: folha de especificações do fabricante (A coluna 1770, C braço 3975, D telesc. recolhida 6890; l2 = D − C = 2915, a mesma conta do 8800LI).
+const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390], '8800LI': [1.77, 3.975, 2.795], 'TITAN6700': [1.77, 3.975, 2.915] };
+// Dados por modelo além das medidas: rótulo, curso total do giro (graus) e tabela de capacidade [alcance mm, kg] do fabricante.
+// A ORDEM de MODELOS importa: o índice na tabela do núcleo do gateway é a posição aqui (modelo novo sempre no fim).
+// Produto AINDA NÃO lançado não entra aqui: vai num modelos-extras.json servido só pelo gateway local (ver o carregador no fim do script).
+const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
 const HIST = 0.05;
 // Giro do 8800LI: 420° de curso, simétrico em volta do zero (±210°), com batente nas duas pontas.
 // O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido no sentido anti-horário visto de cima:
 // o 0° é a lança PERPENDICULAR ao caminhão, e é onde o ESTACIONAR deixa o giro.
 const GIRO_ZERO = 90;
-const GIRO_LIM = [-210, 210];
+let GIRO_LIM = [-210, 210];            // muda com o modelo: curso total do giro (420° no 8800LI) dividido em torno do zero
 const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
 const T1 = [0, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
 
@@ -692,6 +698,15 @@ function painel() {
   $('vHE').textContent = fmt(hE) + ' m';
   $('vHT').textContent = fmt(hT) + ' m';
   $('vP').textContent = fmt(S.pressao, 1) + ' bar';
+  const ex = EXTRAS[S.modelo];
+  if (ex && ex.carga) {                                      // alcance horizontal da ponta e capacidade da tabela do fabricante (interpolada)
+    const [, l1, l2] = MODELOS[S.modelo], c = ex.carga, r = (l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2))) * 1000;
+    let kg;
+    if (r < c[0][0]) kg = '≥ ' + c[0][1].toLocaleString('pt-BR') + ' kg';
+    else if (r > c[c.length - 1][0]) kg = 'fora da tabela';
+    else { let i = 1; while (c[i][0] < r) i++; kg = Math.round(c[i - 1][1] + (c[i][1] - c[i - 1][1]) * (r - c[i - 1][0]) / (c[i][0] - c[i - 1][0])).toLocaleString('pt-BR') + ' kg'; }
+    $('vCap').textContent = fmt(r / 1000, 1) + ' m · ' + kg;
+  }
   const st = $('status');
   st.className = S.alarme ? 'alarme' : S.pregao ? 'pre' : '';
   st.textContent = S.alarme ? 'ALARME — LIMITE' : S.pregao ? 'PRÉ-AVISO' : 'LIVRE';
@@ -718,7 +733,7 @@ $('rOpac').oninput = e => { aplicaOpac(e.target.value); try { localStorage.setIt
 /* ============ Saída para o gateway simulado ============
  * Quem fala com o tablet é o `sim-gateway` (tools/sim-gateway): roda o MESMO núcleo do gateway, serve a /op e cria a rede
  * GATEWAY-101. Esta página só lhe manda, por HTTP local, o que os sensores mandariam. Ver o cabeçalho de sim-gateway.py. */
-const PONTE = (location.hostname === '127.0.0.1' && location.port === '8101') ? location.origin : 'http://127.0.0.1:8101';   // servida pelo gateway: mesma origem, sem aviso do Chrome
+const PONTE = (location.hostname === '127.0.0.1' && /^\/sim\/?$/.test(location.pathname)) ? location.origin : 'http://127.0.0.1:8101';   // servida pelo gateway: mesma origem, sem aviso do Chrome
 let ble = false, bleTimer = null, bleErros = 0;
 function bleEstado(txt, cls) {
   $('vBle').textContent = txt; $('vBle').style.color = cls === 'ok' ? 'var(--good)' : cls === 'erro' ? 'var(--crit)' : '';
@@ -752,7 +767,15 @@ $('bVista').onclick = () => {
   const v = VISTAS[vistaI]; cam.az = rad(v.az); cam.el = rad(v.el);
   $('bVista').textContent = 'Vista: ' + v.n;
 };
-$('selModelo').onchange = e => { S.modelo = e.target.value; log('Modelo ' + S.modelo); };
+// O que depende do modelo: o curso do giro (300° no TITAN 6700; 420° é o padrão) e a linha de capacidade de carga (só onde há tabela).
+function aplicaModelo() {
+  const ex = EXTRAS[S.modelo], total = (ex && ex.giro) || 420;
+  GIRO_LIM = [-total / 2, total / 2];
+  S.giro = Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], S.giro));
+  $('lG').textContent = 'Giro (curso ' + GIRO_LIM[0] + '…+' + GIRO_LIM[1] + ')';
+  $('linCap').style.display = ex && ex.carga ? '' : 'none';
+}
+$('selModelo').onchange = e => { S.modelo = e.target.value; aplicaModelo(); log('Modelo ' + (EXTRAS[S.modelo] && EXTRAS[S.modelo].rotulo || S.modelo)); };
 $('selPre').onchange = e => { S.pre = +e.target.value; };
 $('inLim').onchange = e => { const v = +e.target.value; if (v >= 2 && v <= 9) S.limite = v; e.target.value = S.limite; log('Limite ' + fmt(S.limite) + ' m'); };
 // Zerar grua = horizontal: braço 0° e lança colinear, a pose em que o tablet pede o ZERAR
@@ -792,8 +815,19 @@ function quadro(agora) {
   if (agora - tDesenho >= 1000 / FPS_MAX - 2) { tDesenho = agora; desenha(); painel(); }
   requestAnimationFrame(quadro);
 }
-$('lG').textContent = 'Giro (curso ' + GIRO_LIM[0] + '…+' + GIRO_LIM[1] + ')';
+aplicaModelo();
 log('Simulador pronto');
+// Modelos extras (produto ainda não lançado) + ?modelo=NOME na URL (o quiosque da feira escolhe o produto sem ninguém tocar na tela). Falha em silêncio no site público.
+fetch('modelos-extras.json').then(r => r.ok ? r.json() : null).then(j => {
+  for (const [nome, m] of Object.entries(j || {})) {
+    if (!Array.isArray(m.l) || m.l.length !== 3 || MODELOS[nome]) continue;
+    MODELOS[nome] = m.l; EXTRAS[nome] = m;
+    const o = document.createElement('option'); o.value = nome; o.textContent = m.rotulo || nome; $('selModelo').appendChild(o);
+  }
+}).catch(() => {}).finally(() => {
+  const pm = new URLSearchParams(location.search).get('modelo');
+  if (pm && MODELOS[pm]) { S.modelo = pm; $('selModelo').value = pm; aplicaModelo(); log('Modelo ' + (EXTRAS[pm] && EXTRAS[pm].rotulo || pm)); }
+});
 // ?gateway=1 no endereço liga a saída para o gateway 101 sozinha (feira: ninguém precisa clicar)
 if (new URLSearchParams(location.search).has('gateway')) $('bBle').click();
 requestAnimationFrame(quadro);
