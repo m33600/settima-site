@@ -351,11 +351,8 @@ function passa(dt) {
   const ng = S.giro - S.vel.g * dt;
   const noBatente = (ng <= GIRO_LIM[0] && ng < S.giro) || (ng >= GIRO_LIM[1] && ng > S.giro);
   S.giro = Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], ng));
-  if (noBatente) {
-    S.vel.g = 0;
-    if (!S.blq.g) log('BATENTE do giro em ' + (S.giro > 0 ? '+' : '−') + Math.abs(Math.round(S.giro)) + '°');
-  }
-  S.blq.g = noBatente;
+  if (noBatente) S.vel.g = 0;      // o batente do modelo segura o giro em silêncio: sem log, sem marca de bloqueio
+  S.blq.g = false;
   S.t1 = Math.max(T1[0], Math.min(T1[1], S.t1 + S.vel.b * dt));
   S.t2 = Math.max(T2[0], Math.min(T2[1], S.t2 - S.vel.l * dt));
 
@@ -749,11 +746,13 @@ function bleEstado(txt, cls) {
   $('bBle').classList.toggle('on', ble && cls === 'ok');
 }
 const NATIVO = typeof window.AndroidSim === 'object' && window.AndroidSim && typeof window.AndroidSim.quadro === 'function';   // rodando dentro do app da grua
+// O giro que sai para o gateway nunca passa do curso do modelo, por qualquer caminho que a página tenha chegado nele.
+const giroSaida = () => Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], S.giro));
 async function bleEnvia() {
   if (!ble) return;
   if (NATIVO) {      // o app roda o MESMO núcleo do gateway; o quadro vai direto, sem rede
     try {
-      AndroidSim.quadro(S.giro, S.t1, S.t2, S.pressao, Object.keys(MODELOS).indexOf(S.modelo), S.limite, S.pre);
+      AndroidSim.quadro(giroSaida(), S.t1, S.t2, S.pressao, Object.keys(MODELOS).indexOf(S.modelo), S.limite, S.pre);
       bleEstado('no ar (dash do app)', 'ok');
     } catch (e) { bleEstado('ponte do app falhou', 'erro'); }
     if (ble) bleTimer = setTimeout(bleEnvia, 100);
@@ -762,7 +761,7 @@ async function bleEnvia() {
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 800);
   try {
     const r = await fetch(PONTE + '/sim', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal,
-      body: JSON.stringify({ giro: S.giro, t1: S.t1, t2: S.t2, pressao: S.pressao,
+      body: JSON.stringify({ giro: giroSaida(), t1: S.t1, t2: S.t2, pressao: S.pressao,
                              modelo: Object.keys(MODELOS).indexOf(S.modelo), limite: S.limite, pre: S.pre }) });
     const j = await r.json(); bleErros = 0;
     bleEstado(j.vivo ? 'no ar (GATEWAY-' + j.serie + ')' : 'ligando…', j.vivo ? 'ok' : '');
