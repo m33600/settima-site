@@ -35,6 +35,10 @@ label.opac input { width: 90px; accent-color: var(--accent); }
 button, select, input[type=number] { font: inherit; font-size: 13px; background: var(--bg2); color: var(--ink);
   border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 button:hover { border-color: var(--steel); }
+/* dentro do app da grua (window.AndroidSim): o painel real (/op) por cima do simulador, e o botão de volta */
+#dash { position: fixed; left: 0; top: 0; z-index: 50; border: 0; background: #000; display: none; width: 100%; height: calc(100% - 44px); }
+#bVolta { position: fixed; z-index: 51; left: 0; right: 0; bottom: 0; height: 44px; display: none; border-radius: 0; font-size: 15px; }
+body.noDash #dash, body.noDash #bVolta { display: block; }
 button.on { background: var(--accent); color: #1A1200; border-color: var(--accent); font-weight: 600; }
 .sp { flex: 1; }
 
@@ -107,7 +111,10 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <button id="bTransf" class="on">◜ Transferidores</button>
   <label class="opac" title="Transparência dos transferidores">opacidade <input type="range" id="rOpac" min="5" max="100" value="100"></label>
   <button id="bTela">⛶ Tela cheia</button>
+  <button id="bDash" style="display:none" title="Mostra o painel do operador (dash) como a grua real o mostra">▣ DASH</button>
 </header>
+<iframe id="dash" title="Dash do operador"></iframe>
+<button id="bVolta">◀ SIMULADOR</button>
 
 <aside id="painel">
   <div id="status">LIVRE</div>
@@ -179,8 +186,9 @@ let GIRO_LIM = [-210, 210];            // muda com o modelo: curso total do giro
 const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
 const T1 = [0, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
 
+const P_REP = 60, P_SOBE = 210, P_DESCE = 150;   // pressão do circuito (bar): descanso 60; levantando braço/lança 210; baixando (ou só girando) 150
 const S = { modelo: '8800LI', giro: -70, t1: 22, t2: 10, limite: 4.75, pre: 0.5,
-            alarme: false, pregao: false, pressao: 1.8, vel: { g: 0, b: 0, l: 0 }, blq: { g: false, b: false, l: false } };
+            alarme: false, pregao: false, pressao: 60, vel: { g: 0, b: 0, l: 0 }, blq: { g: false, b: false, l: false } };
 const rad = d => d * Math.PI / 180;
 const fmt = (v, n = 2) => v.toFixed(n).replace('.', ',');
 
@@ -362,7 +370,8 @@ function passa(dt) {
   } else S.pregao = false;
 
   const mov = Math.abs(S.vel.g) + Math.abs(S.vel.b) + Math.abs(S.vel.l) > 0.8;
-  S.pressao += ((mov ? 85 : 1.8) - S.pressao) * Math.min(1, dt * 2);
+  const sobe = S.vel.b > 0.4 || S.vel.l > 0.4;
+  S.pressao += ((!mov ? P_REP : sobe ? P_SOBE : P_DESCE) - S.pressao) * Math.min(1, dt * (mov ? 3 : 1.5));   // sobe rápido ao mover, cai devagar ao parar
   S.movendo = { g: Math.abs(S.vel.g) > 0.8, b: Math.abs(S.vel.b) > 0.4, l: Math.abs(S.vel.l) > 0.4 };
 }
 
@@ -739,8 +748,17 @@ function bleEstado(txt, cls) {
   $('vBle').textContent = txt; $('vBle').style.color = cls === 'ok' ? 'var(--good)' : cls === 'erro' ? 'var(--crit)' : '';
   $('bBle').classList.toggle('on', ble && cls === 'ok');
 }
+const NATIVO = typeof window.AndroidSim === 'object' && window.AndroidSim && typeof window.AndroidSim.quadro === 'function';   // rodando dentro do app da grua
 async function bleEnvia() {
   if (!ble) return;
+  if (NATIVO) {      // o app roda o MESMO núcleo do gateway; o quadro vai direto, sem rede
+    try {
+      AndroidSim.quadro(S.giro, S.t1, S.t2, S.pressao, Object.keys(MODELOS).indexOf(S.modelo), S.limite, S.pre);
+      bleEstado('no ar (dash do app)', 'ok');
+    } catch (e) { bleEstado('ponte do app falhou', 'erro'); }
+    if (ble) bleTimer = setTimeout(bleEnvia, 100);
+    return;
+  }
   const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), 800);
   try {
     const r = await fetch(PONTE + '/sim', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal,
@@ -829,7 +847,14 @@ fetch('modelos-extras.json').then(r => r.ok ? r.json() : null).then(j => {
   if (pm && MODELOS[pm]) { S.modelo = pm; $('selModelo').value = pm; aplicaModelo(); log('Modelo ' + (EXTRAS[pm] && EXTRAS[pm].rotulo || pm)); }
 });
 // ?gateway=1 no endereço liga a saída para o gateway 101 sozinha (feira: ninguém precisa clicar)
-if (new URLSearchParams(location.search).has('gateway')) $('bBle').click();
+if (new URLSearchParams(location.search).has('gateway') || NATIVO) $('bBle').click();
+// No app da grua: DASH abre o painel real (/op, servido pelo próprio app) por cima; o simulador segue rodando por baixo.
+if (NATIVO) {
+  $('bBle').style.display = 'none'; $('bDash').style.display = '';
+  const fr = $('dash');
+  $('bDash').onclick = () => { if (!fr.getAttribute('src')) fr.src = '/op'; document.body.classList.add('noDash'); };
+  $('bVolta').onclick = () => document.body.classList.remove('noDash');
+}
 requestAnimationFrame(quadro);
 </script>
 </body>
