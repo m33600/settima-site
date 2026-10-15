@@ -376,8 +376,8 @@ function t1Minimo(t2) {
 function passa(dt) {
   const inp = entradas(dt);
   if (S.modelo === 'TITAN6700') {      // garra sucateira: rotator continuo (120 °/s, + = horario visto de cima) e abrir/fechar em ~1,7 s
-    S.rot += inp.r * 120 * dt;
-    S.garra = Math.max(0, Math.min(1, S.garra + inp.a * 0.6 * dt));
+    S.rot += (inp.r || 0) * 120 * dt;      // (o ESTACIONAR devolve so g, b, l: sem o "|| 0" o rotator e a garra viravam NaN e sumiam)
+    S.garra = Math.max(0, Math.min(1, S.garra + (inp.a || 0) * 0.6 * dt));
   }
   const alvo = { g: inp.g * VEL.g, b: inp.b * VEL.b, l: inp.l * VEL.l };   // °/s desejados
   const a = Math.min(1, dt / 0.25);
