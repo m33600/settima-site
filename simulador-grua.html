@@ -191,13 +191,13 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <div class="lin"><span>Gateway 101</span><b id="vBle">desligada</b></div>
   <div class="cfg">
     <label>Modelo
-      <select id="selModelo"><option>5570LI</option><option>7700LI</option><option selected>8800LI</option><option value="TITAN6700">TITAN 6700</option></select>
+      <select id="selModelo"><option>5570LI</option><option>7700LI</option><option>8800LI</option><option value="TITAN6700" selected>TITAN 6700</option></select>
     </label>
     <label>Pré-aviso (m)
       <select id="selPre"><option value="0">desligado</option><option value="0.25">0,25</option><option value="0.5" selected>0,50</option><option value="1">1,00</option></select>
     </label>
     <label>Limite (m)
-      <input type="number" id="inLim" min="2" max="10" step="0.05" value="4.75">
+      <input type="number" id="inLim" min="2" max="10" step="0.05" value="5.80">
     </label>
     <label>&nbsp;<button id="bZera">Zerar grua</button></label>
     <button id="bPark" style="grid-column:1/-1">⤓ ESTACIONAR (dobrar lança)</button>
@@ -250,7 +250,7 @@ const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
 const T1 = [0, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
 
 const P_REP = 60, P_SOBE = 210, P_DESCE = 150;   // pressão do circuito (bar): descanso 60; levantando braço/lança 210; baixando (ou só girando) 150
-const S = { garra: 1, rot: 0, modelo: '8800LI', giro: 0, t1: 0, t2: 10, limite: 4.75, pre: 0.5,
+const S = { garra: 1, rot: 0, modelo: 'TITAN6700', giro: 0, t1: 0, t2: 10, limite: 5.8, pre: 0.5,
             alarme: false, pregao: false, pressao: 60, vel: { g: 0, b: 0, l: 0 }, blq: { g: false, b: false, l: false } };
 const rad = d => d * Math.PI / 180;
 const fmt = (v, n = 2) => v.toFixed(n).replace('.', ',');
@@ -1005,7 +1005,7 @@ $('bVista').onclick = () => {
 // O que depende do modelo: o curso do giro (300° no TITAN 6700; 420° é o padrão) e a linha de capacidade de carga (só onde há tabela).
 // Limite de altura padrao por modelo: 2,98 m acima do pivo (o 8800LI abre em 4,75 com o pivo a 1,77). So troca se o usuario nao mexeu no limite.
 const LIM_PADRAO = { 'TITAN6700': 5.8 };
-let limPadrao = 4.75;
+let limPadrao = 5.8;           // o modelo padrao e o TITAN 6700 (produto da feira)
 function aplicaModelo() {
   const novoLim = LIM_PADRAO[S.modelo] || 4.75;
   if (Math.abs(S.limite - limPadrao) < 1e-6) { S.limite = novoLim; $('inLim').value = novoLim.toFixed(2); }
