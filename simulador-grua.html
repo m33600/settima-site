@@ -867,6 +867,19 @@ if (NATIVO) {
   const fr = $('dash');
   $('bDash').onclick = () => { if (!fr.getAttribute('src')) fr.src = '/op'; document.body.classList.add('noDash'); };
   $('bVolta').onclick = () => document.body.classList.remove('noDash');
+  // Toque longo (1 s) na etiqueta SIMULAÇÃO: liga/desliga o modo quiosque do tablet (a equipe sabe; o visitante não tenta).
+  if (typeof window.AndroidSim.alternaQuiosque === 'function') {
+    const tag = document.querySelector('.badge'); let tq = null;
+    const fimTq = () => { clearTimeout(tq); tq = null; };
+    tag.addEventListener('pointerdown', () => {
+      tq = setTimeout(() => {
+        const lig = window.AndroidSim.alternaQuiosque();
+        tag.textContent = lig ? 'QUIOSQUE LIGADO' : 'QUIOSQUE DESLIGADO';
+        setTimeout(() => { tag.textContent = 'SIMULAÇÃO'; }, 3000);
+      }, 1000);
+    });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => tag.addEventListener(ev, fimTq));
+  }
 }
 requestAnimationFrame(quadro);
 </script>
