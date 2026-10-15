@@ -142,6 +142,9 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
 
 <svg id="cena" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet">
   <defs>
+    <!-- logotipos da HFORT (fundo transparente), colados nas laterais da lanca do TITAN 6700 -->
+    <image id="logoHfort" width="475" height="88" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAdsAAABYCAMAAACK963EAAAAwFBMVEUIF2EAAACfAgOEi7F8kOVSWYp4g7pJUHj+BwL8hYJ1h9N4EROtUlM7Q3AAE/wTV/78cW/8fYLbh4dScO/Ob3ISGDvzg319hq9ueNn0fX2BirWFj8X+UlCBjch1eLF8irX+VQT8gnJZh/cvhf4+TIdQXp1+i8GjPUCyeHj+MEv/d4TUfILVg34ARaJ3a257fboAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADeLKptAAAAMHRSTlP/AP/7h/92/wuqcP///w4aWJHmNf//kv9bja7XMapriRBlOiL/M///ciNy//8VU4GUq6SYAAAJlElEQVR42u2diXqjNhCAEUJG5g4GH7GTONntHj3f/+0KTrzBRkgzOjC0nq/t5+4aedDPjEajkfCWTmTNyaWsApGsiEgWwu9+/v1fQRToSkQQcvqZ5j9RjrnKjhqZ/j1+SOb5LiSOd1eqUk8kVHhbteirdYe9ZyAwPitK2eV1IY0y0KXPMD1SRleyZoxu8iTPbtj68YMBWxUU12xf2BAPGllje5LNMN7ImO3WEVvfPttPq3lxyXbL5NfLra1tAKUOexp6wIzZBvNh2xnQ3LHdpwAccuNFQwkc2W3kiu1yjj6ZAtsIX2QBGFqlUOQKgsmyBcZSmymxDVKEK11ZDYLorOx27dBunYy3OTPGYaAdy+yzneV468JuH+14Un3tVvOx25mx3eg09Wh1Yrq9szW9baE/TvXaYlaTDtGdrX22+u2xzCx3IYF798k22Jr0YppZZBvmd7Z22Zp1Yh+ugXZsHmx3c/HJpn2Y5haT/HQWc6DdTOw2N+5CZnMBJ7rPb62xzVLPNlwj7VKLOcf/O1vmWZC9xYXX/S3stizXr7v1brdbr9dl9R9hSz0rEllcVB8/lkq6NTLN58N/Yrzd2kHb8aTmbB/Httuk1/+FYh3oMAe2qSW2F/exsPOc2GBbgRxyH0AFt/OpsqWeNYnsFTp9NLWozX1yobPSrmS7Po7PloUQ6dS7gXJFjUC+htIOEnYvRMoPhX69W2fNnyw8Xsb22VZHMjpbRpCiipEZjchH1inaqNz3E0q7FUWvVMnWq8QlDsQ78kRdRXFRbvywfHhYLqVsD2T6bBVmS6/yTW8M6Oth2mUUuB6k342k0YmXSrZF95LGzqWmHlec3IBtaNNs96JqcAYKp6BPXgAJzEzZNkHvn34skI7ddi+5qDHvX5QUnJDp263MbNnAPoJtCpgHgbWL1GO3Rjduve0/eYdtA4Of5fMTX5ei6if+a1DdFbwvFh64UdhuIGMnxnQjtHYUP+CquvFUGlTX4W+/2A5aNF/2Y6kPtuXxiOnKybH1tMY7ybyJ4bUbaCnX7caM1SmNVo/s/Y9UdfaHXpbpnW3BcV05NbbDqfitzo20kqG1o+iHS96NYf3xacXaT8o9FK+9OVAsSBfPji1T5fy0r0RoN7DAGGh2I22AnlsIvZWa7SmK7qLkDduKT49taMUlU/WlqSLpgHjy4EE6oBuzOmxb3G+ap68JFRmALb+y22N8NSeaI9snjRhVGWHj2YaYVISqGx/rRbu/NWrdwaJxL5l6zyKv/Hh5abcJnzvbIce60L+X8ziJYbuxyZa2XVR7+4i2Y//eewbsR13G8evFeBuXhMx8vA09kzak/tzcbqleN55y5b9mcQGIbZGU/PL/l4DbnzZbvRj5LHvZk4HRLrXJltWnG9uz0489NWz/Vt8Kx7tg8mPSbCMjsx0soLttnEy957bvgtVpdKA1gR4AgZTDj0mPt4+a8x/FcH3b+e2qZie2jacPSdb86yVO2NJi0na7wa+uQcLshZ281Ep7frsldf3S7hLdsuazFxdHB2xvcJYJhi0zbCG3wtZ6Pjk8p8Kz97yUnzhgW06cLTo+halIUdoF1teBfgtPh3Gsnt5/z/P9klsmy8s4hp13sbnReBti80Eww6cY7QZ3c28MppK0rr3mn/eAv61zrKzC9U5ZyvHPMjFnGzhke223uaO6i+yRUvqRgXmvYV0ezpMdbsr5uEwQtefZbXyyZ8p2g2X79TJtqVsvhau7+FV12oifVH+WxYFjAfOHsqqq5HvbBOosE4/1JWS6dY7txSEbkLB7cJAxW4ple3GnkDpHm2w7dTJ+Ur4C8R6PRZn4ca9+Cjje6hUWa1YAZyq2iHM892i2OqXO1tme7XippsuLyuzssDHZ0puOt2BJiXu2bYxVKMLh76bnS43JNrc5B3LHdj8OWz9OXgcnv4fKwl6vEdlSdZzMTIMxG2zJSGxbuofhagzzPZojss3VZpeC0b6Jf+PFnC0dj20jf4jyTpb2347HlkK0AR9v/iQJg4zYhmRUtn3/WiT+7NjmkJwQNRtuPWLM9m1stleJq9LemQijsaWg9VuoU155jtgqHy77bP3k5+cViT9DtjlsdQ04C6L4uguQMHIDtr5/ng4dgN+fFtsN0Kky0Osmco16KdDUNr8N248Ja+HPkm0GXToFpaY20ov12W7JjdiezkUAo50W2/69D55i8kW72Epen2yabHTL1i85HO202PZ9XaY/5H1RXLpwiNYZW7/058mWwmcxgFB18LSKFxO26Ru5KdtkpmxFIcpCdx7CVApqsQ1zclO2Ca9myRZTuKPK1ks2VzMDtuBqHldsD5wnc2SbYeao8jF3laqjXA22wDf9uWP7O+rb02FLcZPU0+AXEezz8PlAaLBNb8z2fX/XOp4d25zgQQnf7RSFoDBXxyeD4Tphe95+ABxy48ms3w6GRpki/xdd1SWGwAUcrVgKCtcJ299xOcd4MnUXGTYr3MFLn9+5RlR5znJkWBWS5g7YJiAvW+FWgfwEdg4ri7aLK4mCQI9tGpwuji5ae36WxLyePWHKJy+IgiiCnE9lkS0vIHQ/K6cgsXLyAFTK5r4C9HmOGu9pgwzqEu0y6RH6uXW2p7X2GGy2TTilJLsWFMAi2OZ6bEM0Wzsn2l93rvTJk8GFjLn4M/+4qpLiZ/cS+XeTJTE9868eyW4tvGRE8FjJtcvM3DKercp2K3CxlMAbj7UfSIPt4HE1JkuICu2k7/7LnLCV2u5lYMSHye44mRVbO145AmSqQ1jSJHfCVlLjlsCqHAdtdsJsbcClkFWIjnYmY64224ZuBXlbQTEQQZGbsg212ObG76OAvder+y0DuAZsxZ65B01E1qIzGZOt8Zu9GEGzlf+mM7aiqCpRlp4nO6sB3qhsDeEyosFWbrm5O7Y9uv1T4Aos2emOt4ZwGdFiq+2Wjdle7b3s7+bjWLKTZkuy0FIYhdBONs5vXLK9tF3B3ybgcXb6PtkgWhaeNQZ88iRwqWO2nzMiweFi5118kP3Xs2A7dEKjfOlGvIIP9SrDcDfO2Z7pivbxrQGznlmxJTnaL28GYh7wiDE45tIR2Lbz3f5JUa28xnHygDrwZMrjrdYK8+AmALh2Q3BHYcs5PyTCgxEk2cW5siU5Mwui8Nrl6Q3t1p7MgG37eg4gWVnyCKOdGO6drQO2MLpUnhZEaSd0y3e2Ttg2vb2X4mVPqgZw2ong3tk6Ytt6ykcx3pBBDs9Gaidwy3e27ti28vb0jX3tNM6+BcAtO1jtvjhj+y/qereezEn95wAAAABJRU5ErkJggg=="/>
+    <image id="logoHfort20" width="505" height="62" href="data:image/png;base64,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"/>
     <linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#1B2230"/><stop offset="1" stop-color="#14160F"/>
     </linearGradient>
@@ -524,6 +527,23 @@ function viga(out, p0, p1, w, h, cor, alfa) {
     out.push({ P, z: (P[0][2]+P[1][2]+P[2][2]+P[3][2]) / 4, cor: cor.map(c => Math.min(255, c * s | 0)), a: alfa });
   }
 }
+/* Decalque: cola uma imagem (id de <image> em <defs>, W x H px) na face lateral de uma viga entre p0 e p1 (largura w, altura h).
+ * lado = +1 / -1 escolhe a lateral; o texto le certo visto de FORA de cada lado. t = fracao do comprimento onde fica o centro;
+ * comp = comprimento da imagem em metros (a altura sai da proporcao e e limitada a 80% da altura da viga). A imagem e levada para a tela por uma
+ * transformacao afim a partir de 3 cantos projetados (boa em faces estreitas) e desenhada logo depois da face, no algoritmo do pintor. */
+function decal(out, p0, p1, w, h, id, W, H, lado, t, comp) {
+  const d = sub(p1, p0), len = Math.hypot(...d), dn = mul(d, 1 / len);
+  const up = Math.abs(d[2]) / len > 0.97 ? [1, 0, 0] : [0, 0, 1];
+  const u = norm(cross(d, up)), v = norm(cross(u, d)), n = mul(u, lado);
+  const hh0 = comp * H / W, k = Math.min(1, 0.8 * h / hh0), L = comp * k, Hh = hh0 * k;
+  const X = lado > 0 ? dn : mul(dn, -1);                                  // eixo da imagem: lado + le no sentido p0->p1; lado - no inverso
+  const c = add(add(p0, mul(d, t)), mul(n, w / 2 + 0.004));
+  const fc = c;
+  if (dot(n, sub(C.pos, fc)) <= 0) return;                                // face de tras
+  const TL = proj(add(add(c, mul(X, -L / 2)), mul(v, Hh / 2))), TR = proj(add(add(c, mul(X, L / 2)), mul(v, Hh / 2))),
+        BL = proj(add(add(c, mul(X, -L / 2)), mul(v, -Hh / 2)));
+  out.push({ id, z: proj(fc)[2] - 0.03, M: [(TR[0] - TL[0]) / W, (TR[1] - TL[1]) / W, (BL[0] - TL[0]) / H, (BL[1] - TL[1]) / H, TL[0], TL[1]] });
+}
 const loc = (ang, x, y, z) => [x*Math.cos(ang) - y*Math.sin(ang), x*Math.sin(ang) + y*Math.cos(ang), z];
 
 /* Cilindro (prisma de n lados) de raio r entre p0 e p1: tubos e pistoes tem secao CIRCULAR, nao quadrada. */
@@ -594,7 +614,7 @@ function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
   const P = (q, y = Y) => to3(q[0], q[1], y);
 
   // bloco do joelho: carcaça no fim do braço + pino atravessando até a lança e as placas
-  viga(f, to3(l1 - 0.35, -0.12, 0), to3(l1 + 0.02, -0.12, 0), 0.4, 0.62, [170, 120, 24]);
+  viga(f, to3(l1 - 0.35, -0.12, 0), to3(l1 + 0.02, -0.12, 0), 0.4, 0.62, S.modelo === 'TITAN6700' ? [28, 92, 48] : [170, 120, 24]);   // carcaca do joelho (verde escuro no Titan)
   viga(f, to3(l1, -kn.KA, -Y - 0.12), to3(l1, -kn.KA, Y + 0.12), 0.16, 0.16, PN);
   // O pistão fica CENTRADO, por cima do braço. Balancim e biela são placas duplas, uma de cada lado do braço
   // (±Y), então nada atravessa o braço nem a lança, nem com ela dobrada por baixo.
@@ -623,7 +643,9 @@ function constroi() {
   const [l0, l1, l2] = MODELOS[S.modelo];
   const f = [];
   const psi = rad(S.giro + GIRO_ZERO), t1 = rad(S.t1), a2 = rad(S.t1 - S.t2);
-  const AM = [226, 164, 28], LA = [222, 128, 30], CZ = [150, 155, 150], PT = [38, 40, 36], CH = [72, 80, 86];
+  // cores: braco e lanca sao amarelo/laranja; no TITAN 6700 sao tons de VERDE (braco verde medio, lanca verde mais claro, joelho verde escuro)
+  const VERDE = S.modelo === 'TITAN6700';
+  const AM = VERDE ? [36, 122, 62] : [226, 164, 28], LA = VERDE ? [86, 178, 100] : [222, 128, 30], CZ = [150, 155, 150], PT = [38, 40, 36], CH = [72, 80, 86];
 
   const TITAN = S.modelo === 'TITAN6700';
   if (!TITAN) {
@@ -657,7 +679,7 @@ function constroi() {
     const ZB = 1.068, ZT = 4.077, ZQ = 2.008, ZP = 2.075, ZV = 2.849;
     const AB = Math.tan(rad(5)) * (l0 - 0.25 - ZB);                  // deslocamento do pe da coluna (para a frente) que a inclina 5 graus
     // coluna inclinada, do centro da base ate o eixo do pivo
-    viga(f, L(AB, 0, ZB), L(0, 0, l0 - 0.25), 0.62, 0.62, ACO);
+    viga(f, L(AB, 0, ZB), L(0, 0, l0 - 0.25), 0.62, 0.62, [30, 104, 56]);                        // coluna: verde (tom do braco, um pouco mais escuro)
     // base: chapa de topo (1,0 x 1,04) sobre 4 chapas-pe inclinadas e sapatas
     viga(f, L(AB - 0.5, 0, ZB - 0.03), L(AB + 0.5, 0, ZB - 0.03), 1.04, 0.06, ACO);
     for (const sa of [-1, 1]) for (const sb of [-1, 1]) {
@@ -740,8 +762,12 @@ function constroi() {
   const kn = knAtual();
   const K = add(P1, mul(nB, -kn.KA));
   const J1 = add(K, mul(nL, kn.KL)), J2 = add(J1, mul(dL, l2));
-  viga(f, K, J1, 0.2, 0.2, [170, 120, 24]);                     // suporte do joelho (rígido com a lança)
+  viga(f, K, J1, 0.2, 0.2, VERDE ? [28, 92, 48] : [170, 120, 24]);   // suporte do joelho (rígido com a lança)
   viga(f, J1, J2, 0.22, 0.24, corL);
+  if (VERDE) {                                         // logotipos na lateral da lanca: colorida de um lado, "20 anos" (branca) do outro
+    decal(f, J1, J2, 0.22, 0.24, 'logoHfort', 475, 88, 1, 0.5, 1.0);
+    decal(f, J1, J2, 0.22, 0.24, 'logoHfort20', 505, 62, -1, 0.5, 1.3);
+  }
   joelho(f, psi, t1, S.t2, P0, dB, l1, CZ);
   viga(f, P1, add(P1, [0, 0, 0.01]), 0.38, 0.38, [90, 94, 92]);              // articulação
   if (TITAN) {
@@ -751,7 +777,7 @@ function constroi() {
     // nao atravessar o chao.
     const zJ = J2[2], k = Math.min(1, Math.max(0.2, zJ / 1.40)), zz = o => zJ - o * k;
     const ang = psi - rad(S.rot), lp = (r, ph, z) => [J2[0] + r * Math.cos(ang + ph), J2[1] + r * Math.sin(ang + ph), z];
-    const PRETO = [30, 32, 30], CAB2 = [60, 64, 62], DENTE = [214, 120, 28], ab = S.garra;
+    const PRETO = [30, 32, 30], CAB2 = [226, 228, 222], DENTE = [244, 244, 240], ab = S.garra;   // garra BRANCA (cabecote e dentes); link e rotator seguem escuros
     const th = ab * rad(65), cs = Math.cos(th), sn = Math.sin(th);      // abertura: cada dente gira como peca RIGIDA em torno do pino do cabecote
     viga(f, J2, [J2[0], J2[1], zz(0.16)], 0.07, 0.07, PRETO);                                     // link
     cilindro(f, [J2[0], J2[1], zz(0.16)], [J2[0], J2[1], zz(0.52)], 0.10, PRETO);                  // rotator
@@ -883,7 +909,7 @@ function desenha() {
 
   // objetos (algoritmo do pintor)
   f.sort((a, b) => b.z - a.z);
-  gObj.innerHTML = f.map(q => q.a != null
+  gObj.innerHTML = f.map(q => q.id ? `<use href="#${q.id}" transform="matrix(${q.M.map(x => x.toFixed(4)).join(' ')})"/>` : q.a != null
     ? `<polygon points="${q.P.map(pt).join(' ')}" fill="rgb(${q.cor})" fill-opacity="${q.a}" stroke="rgba(170,215,240,.25)" stroke-width="1" stroke-linejoin="round"/>`    // vidro
     : `<polygon points="${q.P.map(pt).join(' ')}" fill="rgb(${q.cor})" stroke="rgba(0,0,0,.35)" stroke-width="1" stroke-linejoin="round"/>`).join('');
 
