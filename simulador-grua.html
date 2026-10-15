@@ -507,10 +507,17 @@ function proj(p) {
 
 const LUZ = norm([-0.4, -0.5, 0.8]);
 const FACES = [[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]];
+/* LAT: eixo LATERAL (horizontal, perpendicular ao plano do braco) das pecas que se articulam no plano vertical do braco (braco, lanca, joelho).
+ * Sem ele a secao da viga e definida a partir do vetor "para cima" do mundo, que e TROCADO de repente quando a peca fica quase vertical (e a
+ * direcao lateral inverte quando ela passa da vertical): a lanca parecia torcer ao dobrar e o logotipo pulava de lado. Com LAT a secao gira
+ * continuamente com a peca, como um corpo rigido. Pecas paralelas a LAT (pinos) seguem o calculo antigo. */
+let LAT = null;
 function viga(out, p0, p1, w, h, cor, alfa) {
   const d = sub(p1, p0);
   let up = Math.abs(d[2]) / (Math.hypot(...d) || 1) > 0.97 ? [1, 0, 0] : [0, 0, 1];
-  const u = norm(cross(d, up)), v = norm(cross(u, d));
+  let u = norm(cross(d, up));
+  if (LAT && Math.abs(dot(norm(d), LAT)) < 0.9) u = LAT;
+  const v = norm(cross(u, d));
   const q = [];
   for (const a of [-1, 1]) for (const b of [-1, 1]) for (const e of [p0, p1])
     q.push(add(e, add(mul(u, a*w/2), mul(v, b*h/2))));
@@ -534,7 +541,9 @@ function viga(out, p0, p1, w, h, cor, alfa) {
 function decal(out, p0, p1, w, h, id, W, H, lado, t, comp) {
   const d = sub(p1, p0), len = Math.hypot(...d), dn = mul(d, 1 / len);
   const up = Math.abs(d[2]) / len > 0.97 ? [1, 0, 0] : [0, 0, 1];
-  const u = norm(cross(d, up)), v = norm(cross(u, d)), n = mul(u, lado);
+  let u = norm(cross(d, up));
+  if (LAT && Math.abs(dot(dn, LAT)) < 0.9) u = LAT;
+  const v = norm(cross(u, d)), n = mul(u, lado);
   const hh0 = comp * H / W, k = Math.min(1, 0.8 * h / hh0), L = comp * k, Hh = hh0 * k;
   const X = lado > 0 ? dn : mul(dn, -1);                                  // eixo da imagem: lado + le no sentido p0->p1; lado - no inverso
   const c = add(add(p0, mul(d, t)), mul(n, w / 2 + 0.004));
@@ -741,7 +750,8 @@ function constroi() {
     }
   }
 
-  // braço
+  // braço (a partir daqui as pecas articuladas usam o eixo lateral fixo do plano do braco: ver LAT)
+  LAT = loc(psi, 0, -1, 0);
   const dB = loc(psi, Math.cos(t1), 0, Math.sin(t1));
   const P1 = add(P0, mul(dB, l1));
   viga(f, P0, P1, 0.3, 0.34, AM);
@@ -770,6 +780,7 @@ function constroi() {
   }
   joelho(f, psi, t1, S.t2, P0, dB, l1, CZ);
   viga(f, P1, add(P1, [0, 0, 0.01]), 0.38, 0.38, [90, 94, 92]);              // articulação
+  LAT = null;                                                 // a garra e a cabine usam o calculo comum
   if (TITAN) {
     // garra sucateira de 150 L com link e rotator (lista de pecas do desenho): link curto, rotator (cilindro), cabecote e 4 dentes em casca de laranja.
     // Pende na vertical da ponta da lanca (queda total ~1,36 m, a mesma do gancho dos outros modelos) e gira com o azimute do braco MAIS o rotator.
