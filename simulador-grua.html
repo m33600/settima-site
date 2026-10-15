@@ -44,6 +44,10 @@ button.on { background: var(--accent); color: #1A1200; border-color: var(--accen
 
 #painel { position: absolute; top: 56px; right: 12px; width: 260px; background: rgba(29,32,24,.88);
   border: 1px solid var(--line); border-radius: 10px; padding: 12px; backdrop-filter: blur(4px); }
+#ctl { position: absolute; top: 96px; left: 12px; width: 232px; background: rgba(29,32,24,.88); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px; backdrop-filter: blur(4px); }
+#ctl:empty { display: none; }
+#ctl .cfg { margin-top: 0; }
 #status { text-align: center; font-weight: 800; font-size: 26px; letter-spacing: .08em; padding: 12px 6px;
   border-radius: 8px; background: #23422A; color: var(--good); transition: background .15s; }
 #status.pre { background: #4A3C14; color: var(--warn); }
@@ -83,7 +87,8 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
 /* Tela baixa e larga (tablet de 1024x600): painel compacto, sem log nem dica de teclado, joysticks colados na borda de baixo
    para não cobrirem o painel. O que não cabe rola dentro do painel em vez de sair da tela. */
 @media (min-width: 761px) and (max-height: 680px) {
-  #painel { top: 50px; right: 8px; width: 244px; padding: 8px; max-height: calc(100vh - 62px); overflow-y: auto; }
+  #painel { top: 50px; right: 8px; width: 244px; padding: 8px; }
+  #ctl { top: 88px; left: 8px; width: 214px; padding: 8px; }
   #status { font-size: 20px; padding: 6px; }
   .eixos { margin: 6px 0 2px; }
   .eixo { padding: 3px 2px; }
@@ -91,8 +96,8 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   .cfg { margin-top: 6px; gap: 4px; }
   .cfg input, .cfg select { padding: 3px 5px; }
   #log, #teclas { display: none; }
-  .pad { bottom: 10px; }
-  .pad.v { height: 120px; }
+  .pad { bottom: 10px; width: 120px; height: 120px; }
+  .pad.v { width: 80px; height: 120px; }
   #garraCtl { bottom: 10px; right: 262px; }
   #garraCtl button { width: 74px; height: 44px; }
 }
@@ -101,6 +106,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
    numa linha so; os controles ficam embaixo, ao alcance dos polegares. A cena ocupa o espaco livre (ver ajustaVista()). */
 #bPainel, #resumo { display: none; }
 @media (max-width: 760px) and (orientation: portrait), (max-height: 460px) and (orientation: landscape) {
+  #ctl { display: none !important; }
   header { padding: 6px 8px; gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; pointer-events: auto; }
   header > button { flex: none; white-space: nowrap; }
   h1, .badge, .sp, label.opac, #bTela, #bBle { display: none !important; }
@@ -133,7 +139,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   .pad.v { width: 70px; height: 112px; }
   #padL { left: 10px; } #padR { right: 10px; }
   .pad .rot { display: none; }
-  #garraCtl { right: 96px; bottom: 8px; gap: 5px; }
+  #garraCtl { right: 132px; bottom: 8px; gap: 5px; }
   #garraCtl button { width: 66px; height: 40px; font-size: 11px; }
 }
 </style>
@@ -142,9 +148,8 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
 
 <svg id="cena" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet">
   <defs>
-    <!-- logotipos da HFORT (fundo transparente), colados nas laterais da lanca do TITAN 6700 -->
+    <!-- logotipo da HFORT (fundo transparente), colado nas duas laterais do BRACO do TITAN 6700 -->
     <image id="logoHfort" width="475" height="88" href="data:image/png;base64,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"/>
-    <image id="logoHfort20" width="505" height="62" href="data:image/png;base64,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"/>
     <linearGradient id="ceu" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#1B2230"/><stop offset="1" stop-color="#14160F"/>
     </linearGradient>
@@ -174,6 +179,8 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
 </header>
 <iframe id="dash" title="Dash do operador"></iframe>
 <button id="bVolta">◀ SIMULADOR</button>
+
+<aside id="ctl"></aside>
 
 <aside id="painel">
   <div id="topo"><div id="status">LIVRE</div><button id="bPainel" title="Abrir ou fechar os detalhes">☰</button></div>
@@ -209,15 +216,15 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <div id="log"></div>
 </aside>
 
-<div class="pad" id="padL"><div class="knob"></div>
+<div class="pad v" id="padL" data-eixo="y"><div class="knob"></div>
+  <span class="rot" style="top:6px;left:50%;transform:translateX(-50%)">LANÇA ▲</span>
+  <span class="rot" style="bottom:6px;left:50%;transform:translateX(-50%)">LANÇA ▼</span>
+</div>
+<div class="pad" id="padR"><div class="knob"></div>
   <span class="rot" style="top:6px;left:50%;transform:translateX(-50%)">BRAÇO ▲</span>
   <span class="rot" style="bottom:6px;left:50%;transform:translateX(-50%)">BRAÇO ▼</span>
   <span class="rot" style="left:6px;top:50%;transform:translateY(-50%)">◀</span>
   <span class="rot" style="right:6px;top:50%;transform:translateY(-50%)">▶</span>
-</div>
-<div class="pad v" id="padR" data-eixo="y"><div class="knob"></div>
-  <span class="rot" style="top:6px;left:50%;transform:translateX(-50%)">LANÇA ▲</span>
-  <span class="rot" style="bottom:6px;left:50%;transform:translateX(-50%)">LANÇA ▼</span>
 </div>
 
 <div id="garraCtl" style="display:none">
@@ -355,7 +362,7 @@ function entradas(dt) {
     l: (k('KeyW') || k('KeyQ') || k('PageUp') ? 1 : 0) + (k('KeyS') || k('KeyE') || k('PageDown') ? -1 : 0),
   };
   const gp = leGamepad();
-  const m = { g: kb.g + pad.L.x + gp.g, b: kb.b + pad.L.y + gp.b, l: kb.l + pad.R.y + gp.l,
+  const m = { g: kb.g + pad.R.x + gp.g, b: kb.b + pad.R.y + gp.b, l: kb.l + pad.L.y + gp.l,      // pads na tela: esquerdo = LANCA (↑↓); direito = GIRO (←→) e BRACO (↑↓)
     r: (k('KeyX') ? 1 : 0) - (k('KeyZ') ? 1 : 0) + gp.r + gcmd.rp - gcmd.rm,                       // rotator: X / Z
     a: (k('KeyV') ? 1 : 0) - (k('KeyC') ? 1 : 0) + gp.a + gcmd.abre - gcmd.fecha };               // garra: V abre, C fecha
   const manual = m.g || m.b || m.l;
@@ -755,6 +762,10 @@ function constroi() {
   const dB = loc(psi, Math.cos(t1), 0, Math.sin(t1));
   const P1 = add(P0, mul(dB, l1));
   viga(f, P0, P1, 0.3, 0.34, AM);
+  if (VERDE) {                                         // logotipo HFORT (azul) nas duas laterais do braco, centrado no comprimento
+    decal(f, P0, P1, 0.3, 0.34, 'logoHfort', 475, 88, 1, 0.5, 1.15);
+    decal(f, P0, P1, 0.3, 0.34, 'logoHfort', 475, 88, -1, 0.5, 1.15);
+  }
   // cilindro de elevação do braço (escondido junto com o do joelho; ver MOSTRA_PISTAO)
   if (MOSTRA_PISTAO || TITAN) {          // no Titan o desenho mostra o cilindro de elevacao do braco ao lado da coluna
     const cb0 = loc(psi, -0.35, 0, l0 - 0.6);
@@ -774,10 +785,6 @@ function constroi() {
   const J1 = add(K, mul(nL, kn.KL)), J2 = add(J1, mul(dL, l2));
   viga(f, K, J1, 0.2, 0.2, VERDE ? [28, 92, 48] : [170, 120, 24]);   // suporte do joelho (rígido com a lança)
   viga(f, J1, J2, 0.22, 0.24, corL);
-  if (VERDE) {                                         // logotipos na lateral da lanca: colorida de um lado, "20 anos" (branca) do outro
-    decal(f, J1, J2, 0.22, 0.24, 'logoHfort', 475, 88, 1, 0.5, 1.0);
-    decal(f, J1, J2, 0.22, 0.24, 'logoHfort20', 505, 62, -1, 0.5, 1.3);
-  }
   joelho(f, psi, t1, S.t2, P0, dB, l1, CZ);
   viga(f, P1, add(P1, [0, 0, 0.01]), 0.38, 0.38, [90, 94, 92]);              // articulação
   LAT = null;                                                 // a garra e a cabine usam o calculo comum
@@ -1148,6 +1155,9 @@ function ajustaVista() {
   if (cel !== eraCelular) {                      // ao entrar/sair do modo celular: transferidores acompanham (poluem a tela pequena)
     eraCelular = cel; if (cel && mostraTransf) { mostraTransf = false; $('bTransf').classList.remove('on'); }
   }
+  const ctl = $('ctl'), painel = $('painel'), cfg = painel.querySelector('.cfg') || ctl.querySelector('.cfg'), logEl2 = $('log');
+  if (cel) { if (cfg.parentNode !== painel) { painel.appendChild(cfg); painel.appendChild(logEl2); } }
+  else if (cfg.parentNode !== ctl) { ctl.appendChild(cfg); ctl.appendChild(logEl2); }      // PC/tablet: configuracao na caixa da esquerda, o painel direito so com estado e leituras
   if (!cel) { Object.assign(VB, { x: 0, y: 0, w: 1600, h: 900 }); cena.setAttribute('viewBox', '0 0 1600 900'); return; }
   const retrato = h > w;
   const fx0 = 0, fx1 = retrato ? w : w - 240, fy0 = retrato ? 104 : 44, fy1 = retrato ? h - 214 : h - 6;     // retangulo livre, em px
