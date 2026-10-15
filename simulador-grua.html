@@ -72,6 +72,11 @@ button.on { background: var(--accent); color: #1A1200; border-color: var(--accen
   border-radius: 50%; background: var(--accent); opacity: .9; box-shadow: 0 2px 8px #0008; pointer-events: none; }
 .pad .rot { position: absolute; font-size: 11px; color: var(--ink-soft); letter-spacing: .08em; pointer-events: none; }
 #padL { left: 20px; } #padR { right: 20px; }
+/* comandos da garra (so no TITAN 6700): rotator e abrir/fechar, botoes de segurar */
+#garraCtl { position: absolute; right: 284px; bottom: 70px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+#garraCtl button { width: 84px; height: 50px; font: 600 12px/1 system-ui, sans-serif; letter-spacing: .06em; color: var(--ink);
+  background: rgba(29,32,24,.8); border: 2px solid var(--line); border-radius: 10px; touch-action: none; cursor: pointer; }
+#garraCtl button.on { background: var(--accent); color: #14160F; border-color: var(--accent); }
 #teclas { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 14px; color: var(--ink-soft); pointer-events: none; }
 kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px; padding: 2px 8px; color: var(--ink); font-size: 13px; }
 
@@ -88,11 +93,15 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   #log, #teclas { display: none; }
   .pad { bottom: 10px; }
   .pad.v { height: 120px; }
+  #garraCtl { bottom: 10px; right: 262px; }
+  #garraCtl button { width: 74px; height: 44px; }
 }
 @media (max-width: 760px) {
   #painel { top: auto; bottom: 230px; right: 8px; left: 8px; width: auto; }
   #teclas { display: none; }
   .pad { bottom: 14px; }
+  #garraCtl { bottom: 14px; right: 110px; }
+  #garraCtl button { width: 64px; height: 42px; font-size: 11px; }
 }
 </style>
 </head>
@@ -140,6 +149,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <div class="lin"><span id="lG">Giro</span><b id="vG">0°</b></div>
   <div class="lin"><span>Braço (θ1)</span><b id="vB">0°</b></div>
   <div class="lin"><span>Lança (θ2)</span><b id="vL">0°</b></div>
+  <div class="lin" id="linGarra" style="display:none"><span>Garra · rotator</span><b id="vGarra">—</b></div>
   <div class="lin"><span>Altura do cotovelo</span><b id="vHE">0 m</b></div>
   <div class="lin"><span>Altura da ponta</span><b id="vHT">0 m</b></div>
   <div class="lin"><span>Pressão (simulada)</span><b id="vP">0 bar</b></div>
@@ -173,6 +183,11 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <span class="rot" style="bottom:6px;left:50%;transform:translateX(-50%)">LANÇA ▼</span>
 </div>
 
+<div id="garraCtl" style="display:none">
+  <button data-a="rm">◀ GIRA</button><button data-a="rp">GIRA ▶</button>
+  <button data-a="fecha">FECHAR</button><button data-a="abre">ABRIR</button>
+</div>
+
 <div id="teclas">
   <kbd>←</kbd> <kbd>→</kbd> giro &nbsp;·&nbsp; <kbd>↑</kbd> <kbd>↓</kbd> braço &nbsp;·&nbsp;
   <kbd>W</kbd> <kbd>S</kbd> (ou <kbd>Q</kbd> <kbd>E</kbd>, <kbd>PgUp</kbd> <kbd>PgDn</kbd>) <b>lança</b> &nbsp;·&nbsp; <kbd>espaço</kbd> demonstração &nbsp;·&nbsp;
@@ -201,7 +216,7 @@ const VEL = { g: 18, b: 9, l: 14 };          // °/s no fundo de curso
 const T1 = [0, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear com o braço (máximo da 8800: não passa da linha do braço); 180° = dobrada, paralela (transporte)
 
 const P_REP = 60, P_SOBE = 210, P_DESCE = 150;   // pressão do circuito (bar): descanso 60; levantando braço/lança 210; baixando (ou só girando) 150
-const S = { modelo: '8800LI', giro: -70, t1: 22, t2: 10, limite: 4.75, pre: 0.5,
+const S = { garra: 1, rot: 0, modelo: '8800LI', giro: 0, t1: 22, t2: 10, limite: 4.75, pre: 0.5,
             alarme: false, pregao: false, pressao: 60, vel: { g: 0, b: 0, l: 0 }, blq: { g: false, b: false, l: false } };
 const rad = d => d * Math.PI / 180;
 const fmt = (v, n = 2) => v.toFixed(n).replace('.', ',');
@@ -262,10 +277,20 @@ ligaPad(document.getElementById('padR'), pad.R);
 
 function leGamepad() {
   const g = (navigator.getGamepads && [...navigator.getGamepads()].find(x => x));
-  if (!g) return { g: 0, b: 0, l: 0 };
+  if (!g) return { g: 0, b: 0, l: 0, r: 0, a: 0 };
   const z = v => Math.abs(v) < 0.15 ? 0 : v;
-  return { g: z(g.axes[0] || 0), b: -z(g.axes[1] || 0), l: -z(g.axes[3] || 0) };
+  const bt = i => g.buttons[i] && g.buttons[i].pressed ? 1 : 0;
+  // garra: eixo 2 (stick direito, horizontal) = rotator; botoes 0/5 = abrir, 1/4 = fechar
+  return { g: z(g.axes[0] || 0), b: -z(g.axes[1] || 0), l: -z(g.axes[3] || 0), r: z(g.axes[2] || 0), a: (bt(0) || bt(5)) - (bt(1) || bt(4)) };
 }
+// botoes de segurar da garra (toque / mouse)
+const gcmd = { rm: 0, rp: 0, abre: 0, fecha: 0 };
+document.querySelectorAll('#garraCtl button').forEach(b => {
+  const k = b.dataset.a;
+  b.addEventListener('pointerdown', e => { gcmd[k] = 1; b.classList.add('on'); b.setPointerCapture(e.pointerId); audioLiga(); });
+  const solta = () => { gcmd[k] = 0; b.classList.remove('on'); };
+  b.addEventListener('pointerup', solta); b.addEventListener('pointercancel', solta);
+});
 
 /* Demonstração: dirige a grua sozinha por poses, passando do limite de propósito */
 const ROTEIRO = [
@@ -293,7 +318,9 @@ function entradas(dt) {
     l: (k('KeyW') || k('KeyQ') || k('PageUp') ? 1 : 0) + (k('KeyS') || k('KeyE') || k('PageDown') ? -1 : 0),
   };
   const gp = leGamepad();
-  const m = { g: kb.g + pad.L.x + gp.g, b: kb.b + pad.L.y + gp.b, l: kb.l + pad.R.y + gp.l };
+  const m = { g: kb.g + pad.L.x + gp.g, b: kb.b + pad.L.y + gp.b, l: kb.l + pad.R.y + gp.l,
+    r: (k('KeyX') ? 1 : 0) - (k('KeyZ') ? 1 : 0) + gp.r + gcmd.rp - gcmd.rm,                       // rotator: X / Z
+    a: (k('KeyV') ? 1 : 0) - (k('KeyC') ? 1 : 0) + gp.a + gcmd.abre - gcmd.fecha };               // garra: V abre, C fecha
   const manual = m.g || m.b || m.l;
   if (estaciona && manual) { estaciona = false; faseDobra = false; log('Estacionar cancelado'); }
   if (estaciona) {
@@ -322,7 +349,7 @@ function entradas(dt) {
   if (demo && manual) alternaDemo();                     // tocou: a demonstração larga o comando
   const r = demo ? entradaDemo(dt) : m;
   const c = v => Math.max(-1, Math.min(1, v));
-  return { g: c(r.g), b: c(r.b), l: c(r.l) };
+  return { g: c(r.g), b: c(r.b), l: c(r.l), r: c(m.r), a: c(m.a) };      // garra e rotator valem tambem na demonstracao
 }
 
 /* ============ Física ============ */
@@ -331,7 +358,8 @@ function entradas(dt) {
  * Mesmas fórmulas do desenho: o pino K fica KOFF abaixo do eixo do braço e a lança sai de um suporte rígido. */
 function folgaChao(t1d, t2d) {
   const [l0, l1, l2] = MODELOS[S.modelo], t1 = rad(t1d), a2 = rad(t1d - t2d);
-  const j1 = l0 + l1 * Math.sin(t1) - KOFF * Math.cos(t1) + KOFF * Math.cos(a2);
+  const kn = knAtual();
+  const j1 = l0 + l1 * Math.sin(t1) - kn.KA * Math.cos(t1) + kn.KL * Math.cos(a2);
   return Math.min(j1, j1 + l2 * Math.sin(a2)) - 0.12;
 }
 const FOLGA_BLOQUEIO = 0.25, FOLGA_ESTACIONA = 0.35;     // o chão trava o movimento abaixo de 25 cm; o estacionar pede 35 cm
@@ -347,6 +375,10 @@ function t1Minimo(t2) {
 
 function passa(dt) {
   const inp = entradas(dt);
+  if (S.modelo === 'TITAN6700') {      // garra sucateira: rotator continuo (120 °/s, + = horario visto de cima) e abrir/fechar em ~1,7 s
+    S.rot += inp.r * 120 * dt;
+    S.garra = Math.max(0, Math.min(1, S.garra + inp.a * 0.6 * dt));
+  }
   const alvo = { g: inp.g * VEL.g, b: inp.b * VEL.b, l: inp.l * VEL.l };   // °/s desejados
   const a = Math.min(1, dt / 0.25);
   const cur = maxH(S.t1, S.t2);
@@ -490,57 +522,65 @@ function cilindro(out, p0, p1, r, cor, n = 14) {
  * Coordenadas (u,w): u ao longo do braço a partir do pivô, w perpendicular (para cima).   */
 const MOSTRA_PISTAO = false;   // cilindros hidráulicos (do braço e do joelho) escondidos por enquanto; mude para true para devolvê-los
 const KOFF = 0.30;
-const KN = { Qu: -0.70, Qw: 0.22, Cu: 0.35, b: 0.80, a: 0.95, abre: 125, r: 1.10, rs: 0.80, rh: 0.20, Y: 0.20 };
+const KN = { Qu: -0.70, Qw: 0.22, Cu: 0.35, b: 0.80, a: 0.95, abre: 125, r: 1.10, rs: 0.80, rh: 0.20, Y: 0.20, KA: KOFF, KL: KOFF };
+// TITAN 6700 (desenho 2D de fabrica): o pino fica NO eixo do braco (KA = 0) e a lanca sai de um joelho que a ergue 0,32 acima do braco
+// (KL), entao esticada ela NAO e colinear com o braco. O pistao corre acima e paralelo ao braco (base em C, 2,4 antes do fim do braco);
+// na ponta da haste (A) se juntam DOIS links: a reacao, que apoia num ponto fixo do braco (Q), e o que puxa a lanca (R). Sem balancim:
+// abre = 0 faz A = B. Medidas tiradas do desenho ampliado (escala 29 mm/px).
+const KN_T = { Qu: -0.05, Qw: 0.0, Cx: -2.4, Cw: 0.34, b: 0.57, a: 0.57, abre: 0, r: 0.49, rs: 0.12, rh: 0.0, Y: 0.20, KA: 0, KL: 0.32, th0: rad(124) };
+const knAtual = () => S.modelo === 'TITAN6700' ? KN_T : KN;
 let thB = rad(40);
-const Rjib = (t2) => [KOFF * Math.sin(t2) + KN.rs * Math.cos(t2) + KN.rh * Math.sin(t2),
-                      -KOFF + KOFF * Math.cos(t2) - KN.rs * Math.sin(t2) + KN.rh * Math.cos(t2)];   // relativo ao fim do braço
+const Rjib = (t2, kn = KN) => [kn.KL * Math.sin(t2) + kn.rs * Math.cos(t2) + kn.rh * Math.sin(t2),
+                      -kn.KA + kn.KL * Math.cos(t2) - kn.rs * Math.sin(t2) + kn.rh * Math.cos(t2)];   // relativo ao fim do braço
 function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
-  const t2 = rad(t2d);
+  const MP = MOSTRA_PISTAO || S.modelo === 'TITAN6700';   // o desenho do Titan mostra o cilindro do joelho; os outros modelos seguem com ele escondido
+  const kn = knAtual(), t2 = rad(t2d);
+  if (joelho.modelo !== S.modelo) { joelho.modelo = S.modelo; thB = kn.th0 !== undefined ? kn.th0 : rad(40); }   // outra geometria: recomeca no ramo certo
   const nB = loc(psi, -Math.sin(t1), 0, Math.cos(t1));
   const lado = y => loc(psi, 0, y, 0);
   const to3 = (u, w, y) => add(add(add(P0, mul(dB, u)), mul(nB, w)), lado(y));
-  const Q = [l1 + KN.Qu, KN.Qw];
-  const r = KN.r;
-  const Rj = Rjib(t2), R = [l1 + Rj[0], Rj[1]];
+  const Q = [l1 + kn.Qu, kn.Qw];
+  const r = kn.r;
+  const Rj = Rjib(t2, kn), R = [l1 + Rj[0], Rj[1]];
   // interseção círculo(Q,b) × círculo(R,r)
   const dx = R[0] - Q[0], dy = R[1] - Q[1], d = Math.hypot(dx, dy) || 1e-6;
   let cand;
-  if (d > KN.b + r || d < Math.abs(KN.b - r)) cand = [Math.atan2(dy, dx) + (d < Math.abs(KN.b - r) && r > KN.b ? Math.PI : 0)];
+  if (d > kn.b + r || d < Math.abs(kn.b - r)) cand = [Math.atan2(dy, dx) + (d < Math.abs(kn.b - r) && r > kn.b ? Math.PI : 0)];
   else {
-    const aa = (KN.b * KN.b - r * r + d * d) / (2 * d), hh = Math.sqrt(Math.max(0, KN.b * KN.b - aa * aa));
+    const aa = (kn.b * kn.b - r * r + d * d) / (2 * d), hh = Math.sqrt(Math.max(0, kn.b * kn.b - aa * aa));
     const mx = Q[0] + aa * dx / d, my = Q[1] + aa * dy / d;
     cand = [[mx - hh * dy / d, my + hh * dx / d], [mx + hh * dy / d, my - hh * dx / d]].map(q => Math.atan2(q[1] - Q[1], q[0] - Q[0]));
   }
   const dif = (x, y) => Math.abs(Math.atan2(Math.sin(x - y), Math.cos(x - y)));
   thB = cand.reduce((m, c) => dif(c, thB) < dif(m, thB) ? c : m);
-  const B = [Q[0] + KN.b * Math.cos(thB), Q[1] + KN.b * Math.sin(thB)];
-  const thA = thB + rad(KN.abre);
-  const A = [Q[0] + KN.a * Math.cos(thA), Q[1] + KN.a * Math.sin(thA)];
-  const C = [KN.Cu * l1, KN.Qw], Y = KN.Y, AC = [75, 80, 78], PN = [34, 36, 34], BI = [190, 194, 186];
+  const B = [Q[0] + kn.b * Math.cos(thB), Q[1] + kn.b * Math.sin(thB)];
+  const thA = thB + rad(kn.abre);
+  const A = [Q[0] + kn.a * Math.cos(thA), Q[1] + kn.a * Math.sin(thA)];
+  const C = kn.Cx !== undefined ? [l1 + kn.Cx, kn.Cw] : [kn.Cu * l1, kn.Qw], Y = kn.Y, AC = [75, 80, 78], PN = [34, 36, 34], BI = [190, 194, 186];
   const P = (q, y = Y) => to3(q[0], q[1], y);
 
   // bloco do joelho: carcaça no fim do braço + pino atravessando até a lança e as placas
   viga(f, to3(l1 - 0.35, -0.12, 0), to3(l1 + 0.02, -0.12, 0), 0.4, 0.62, [170, 120, 24]);
-  viga(f, to3(l1, -KOFF, -Y - 0.12), to3(l1, -KOFF, Y + 0.12), 0.16, 0.16, PN);
+  viga(f, to3(l1, -kn.KA, -Y - 0.12), to3(l1, -kn.KA, Y + 0.12), 0.16, 0.16, PN);
   // O pistão fica CENTRADO, por cima do braço. Balancim e biela são placas duplas, uma de cada lado do braço
   // (±Y), então nada atravessa o braço nem a lança, nem com ela dobrada por baixo.
-  const up = [Math.sin(t2), Math.cos(t2)], Jr = [R[0] - KN.rh * up[0], R[1] - KN.rh * up[1]];
+  const up = [Math.sin(t2), Math.cos(t2)], Jr = [R[0] - kn.rh * up[0], R[1] - kn.rh * up[1]];
   viga(f, P([Q[0], 0], 0), P(Q, 0), 0.09, 0.09, PN);                  // cavalete do pivô do balancim, sobre o braço
-  if (MOSTRA_PISTAO) viga(f, P([C[0], 0], 0), P(C, 0), 0.09, 0.09, PN);   // base do pistão, sobre o braço
+  if (MP) viga(f, P([C[0], 0], 0), P(C, 0), 0.09, 0.09, PN);   // base do pistão, sobre o braço
   viga(f, P(Jr, 0), P(R, 0), 0.09, 0.09, PN);                          // cavalete da biela, na lança
   viga(f, P(Q, -Y), P(Q, Y), 0.09, 0.09, PN);                          // pinos que atravessam as placas
   viga(f, P(R, -Y), P(R, Y), 0.09, 0.09, PN);
-  if (MOSTRA_PISTAO) viga(f, P(A, -Y), P(A, Y), 0.09, 0.09, PN);
+  if (MP) viga(f, P(A, -Y), P(A, Y), 0.09, 0.09, PN);
   for (const y of [-Y, Y]) {
     viga(f, P(Q, y), P(B, y), 0.06, 0.13, AC);
-    if (MOSTRA_PISTAO) viga(f, P(Q, y), P(A, y), 0.06, 0.13, AC);   // perna do balancim que recebe o cilindro
+    if (MP && kn.abre !== 0) viga(f, P(Q, y), P(A, y), 0.06, 0.13, AC);   // perna do balancim que recebe o cilindro (no Titan nao ha balancim: A = B)
     viga(f, P(B, y), P(R, y), 0.05, 0.09, BI);
     for (const q of [Q, B, R]) viga(f, P(q, y - 0.03), P(q, y + 0.03), 0.14, 0.14, PN);   // olhais
   }
-  if (MOSTRA_PISTAO) {
+  if (MP) {
     const mid = [(C[0] + A[0]) / 2, (C[1] + A[1]) / 2];
-    viga(f, P(C, 0), P(mid, 0), 0.12, 0.16, CZ);                         // camisa do pistão
-    viga(f, P(mid, 0), P(A, 0), 0.06, 0.09, [215, 218, 210]);            // haste
+    cilindro(f, P(C, 0), P(mid, 0), 0.075, CZ);                          // camisa do pistão (redonda)
+    cilindro(f, P(mid, 0), P(A, 0), 0.04, [215, 218, 210]);              // haste (redonda)
     for (const q of [C, A]) viga(f, P(q, -0.07), P(q, 0.07), 0.14, 0.14, PN);
   }
 }
@@ -650,10 +690,10 @@ function constroi() {
   const P1 = add(P0, mul(dB, l1));
   viga(f, P0, P1, 0.3, 0.34, AM);
   // cilindro de elevação do braço (escondido junto com o do joelho; ver MOSTRA_PISTAO)
-  if (MOSTRA_PISTAO) {
+  if (MOSTRA_PISTAO || TITAN) {          // no Titan o desenho mostra o cilindro de elevacao do braco ao lado da coluna
     const cb0 = loc(psi, -0.35, 0, l0 - 0.6);
     const cb1 = add(P0, mul(dB, l1 * 0.28)); cb1[2] -= 0.12;
-    viga(f, cb0, cb1, 0.12, 0.12, CZ);
+    cilindro(f, cb0, cb1, 0.07, CZ);
   }
   // lança
   const dL = loc(psi, Math.cos(a2), 0, Math.sin(a2));
@@ -663,25 +703,34 @@ function constroi() {
   // Esticada (θ2=0) o eixo da lança é colinear com o do braço; dobrada (180°) ela fica paralela, ABAIXO do braço.
   const nB = loc(psi, -Math.sin(t1), 0, Math.cos(t1));
   const nL = loc(psi, -Math.sin(a2), 0, Math.cos(a2));          // "para cima" da lança
-  const K = add(P1, mul(nB, -KOFF));
-  const J1 = add(K, mul(nL, KOFF)), J2 = add(J1, mul(dL, l2));
+  const kn = knAtual();
+  const K = add(P1, mul(nB, -kn.KA));
+  const J1 = add(K, mul(nL, kn.KL)), J2 = add(J1, mul(dL, l2));
   viga(f, K, J1, 0.2, 0.2, [170, 120, 24]);                     // suporte do joelho (rígido com a lança)
   viga(f, J1, J2, 0.22, 0.24, corL);
   joelho(f, psi, t1, S.t2, P0, dB, l1, CZ);
   viga(f, P1, add(P1, [0, 0, 0.01]), 0.38, 0.38, [90, 94, 92]);              // articulação
   if (TITAN) {
-    // garra sucateira de 150 L com link e rotator (lista de pecas do desenho): link curto, rotator, cabecote e 4 dentes em casca de laranja.
-    // Pende na vertical da ponta da lanca (queda total ~1,36 m, a mesma do gancho dos outros modelos) e gira com o azimute do braco.
-    const zJ = J2[2], lp = (r, ph, z) => [J2[0] + r * Math.cos(psi + ph), J2[1] + r * Math.sin(psi + ph), z];
-    const PRETO = [30, 32, 30], CAB2 = [60, 64, 62], DENTE = [214, 120, 28];
-    viga(f, J2, [J2[0], J2[1], zJ - 0.16], 0.07, 0.07, PRETO);                                    // link
-    cilindro(f, [J2[0], J2[1], zJ - 0.16], [J2[0], J2[1], zJ - 0.52], 0.10, PRETO);               // rotator
-    const zc = zJ - 0.60;
-    viga(f, lp(-0.26, 0, zc), lp(0.26, 0, zc), 0.52, 0.16, CAB2);                                 // cabecote
-    for (let k = 0; k < 4; k++) {
-      const ph = Math.PI / 4 + k * Math.PI / 2;
-      viga(f, lp(0.20, ph, zc - 0.04), lp(0.46, ph, zc - 0.30), 0.34, 0.05, DENTE);               // dente: abre ate o ventre...
-      viga(f, lp(0.46, ph, zc - 0.30), lp(0.07, ph, zc - 0.76), 0.28, 0.05, DENTE);               // ...e fecha na ponta
+    // garra sucateira de 150 L com link e rotator (lista de pecas do desenho): link curto, rotator (cilindro), cabecote e 4 dentes em casca de laranja.
+    // Pende na vertical da ponta da lanca (queda total ~1,36 m, a mesma do gancho dos outros modelos) e gira com o azimute do braco MAIS o rotator.
+    // S.garra (0 fechada ... 1 aberta) abre os dentes; S.rot (graus, + = horario) gira o conjunto. Se a ponta estiver baixa, a garra se comprime para
+    // nao atravessar o chao.
+    const zJ = J2[2], k = Math.min(1, Math.max(0.2, zJ / 1.40)), zz = o => zJ - o * k;
+    const ang = psi - rad(S.rot), lp = (r, ph, z) => [J2[0] + r * Math.cos(ang + ph), J2[1] + r * Math.sin(ang + ph), z];
+    const PRETO = [30, 32, 30], CAB2 = [60, 64, 62], DENTE = [214, 120, 28], ab = S.garra;
+    const th = ab * rad(65), cs = Math.cos(th), sn = Math.sin(th);      // abertura: cada dente gira como peca RIGIDA em torno do pino do cabecote
+    viga(f, J2, [J2[0], J2[1], zz(0.16)], 0.07, 0.07, PRETO);                                     // link
+    cilindro(f, [J2[0], J2[1], zz(0.16)], [J2[0], J2[1], zz(0.52)], 0.10, PRETO);                  // rotator
+    viga(f, lp(0.10, 0, zz(0.34)), lp(0.17, 0, zz(0.34)), 0.05, 0.05, DENTE);                       // marca que mostra o giro do rotator
+    viga(f, lp(-0.26, 0, zz(0.60)), lp(0.26, 0, zz(0.60)), 0.52, 0.16, CAB2);                      // cabecote
+    // dente (raio r, queda d) rigido e curvo: pino H=(0,20; 0,64), ventre a (+0,16; +0,26) e ponta a (-0,18; +0,72) do pino com a garra FECHADA;
+    // abrir = girar o dente inteiro em torno de H, com uma unica articulacao (o ventre e a ponta nao se movem entre si)
+    const rot2 = (dr, dd) => [0.20 + dr * cs + dd * sn, 0.64 + dd * cs - dr * sn];
+    const Kd = rot2(0.16, 0.26), Td = rot2(-0.18, 0.72);
+    for (let q = 0; q < 4; q++) {
+      const ph = Math.PI / 4 + q * Math.PI / 2;
+      viga(f, lp(0.20, ph, zz(0.64)), lp(Kd[0], ph, zz(Kd[1])), 0.34, 0.05, DENTE);              // dente: do pino ao ventre...
+      viga(f, lp(Kd[0], ph, zz(Kd[1])), lp(Td[0], ph, zz(Td[1])), 0.28, 0.05, DENTE);            // ...e do ventre a ponta
     }
   } else {
   // gancho
@@ -830,6 +879,7 @@ const $ = id => document.getElementById(id);
 function painel() {
   const { hE, hT } = alturas();
   $('vG').textContent = (Math.round(S.giro) || 0) + '°';
+  $('vGarra').textContent = (S.garra > 0.98 ? 'aberta' : S.garra < 0.02 ? 'fechada' : Math.round(S.garra * 100) + '% aberta') + ' · ' + ((Math.round(S.rot) % 360) + 360) % 360 + '°';
   $('vB').textContent = fmt(S.t1, 1) + '°';
   $('vL').textContent = fmt(S.t2, 1) + '°';
   $('vHE').textContent = fmt(hE) + ' m';
@@ -928,6 +978,8 @@ function aplicaModelo() {
   S.giro = Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], S.giro));
   $('lG').textContent = 'Giro (curso ' + GIRO_LIM[0] + '…+' + GIRO_LIM[1] + ')';
   $('linCap').style.display = ex && ex.carga ? '' : 'none';
+  const tit = S.modelo === 'TITAN6700';
+  $('linGarra').style.display = tit ? '' : 'none'; $('garraCtl').style.display = tit ? '' : 'none';
 }
 $('selModelo').onchange = e => { S.modelo = e.target.value; aplicaModelo(); log('Modelo ' + (EXTRAS[S.modelo] && EXTRAS[S.modelo].rotulo || S.modelo)); };
 $('selPre').onchange = e => { S.pre = +e.target.value; };
