@@ -96,12 +96,45 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   #garraCtl { bottom: 10px; right: 262px; }
   #garraCtl button { width: 74px; height: 44px; }
 }
-@media (max-width: 760px) {
-  #painel { top: auto; bottom: 230px; right: 8px; left: 8px; width: auto; }
-  #teclas { display: none; }
-  .pad { bottom: 14px; }
-  #garraCtl { bottom: 14px; right: 110px; }
-  #garraCtl button { width: 64px; height: 42px; font-size: 11px; }
+/* ===== MODO CELULAR (retrato e paisagem) =====
+   O painel vira uma faixa FECHADA no topo (estado, ponta, pressao) que abre por cima da cena com o botao ☰; o cabecalho fica
+   numa linha so; os controles ficam embaixo, ao alcance dos polegares. A cena ocupa o espaco livre (ver ajustaVista()). */
+#bPainel, #resumo { display: none; }
+@media (max-width: 760px) and (orientation: portrait), (max-height: 460px) and (orientation: landscape) {
+  header { padding: 6px 8px; gap: 4px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; pointer-events: auto; }
+  header > button { flex: none; white-space: nowrap; }
+  h1, .badge, .sp, label.opac, #bTela, #bBle { display: none !important; }
+  header button { font-size: 11px; padding: 5px 6px; }
+  #painel { top: 44px; left: 8px; right: 8px; width: auto; padding: 6px; z-index: 10; }
+  #topo { display: flex; gap: 6px; align-items: stretch; }
+  #topo #status { flex: 1; font-size: 16px; padding: 6px; letter-spacing: .06em; }
+  #bPainel { display: block; width: 44px; font-size: 18px; padding: 0; }
+  #resumo { display: block; margin-top: 4px; text-align: center; font-size: 12px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  #painel:not(.aberto) > :not(#topo):not(#resumo) { display: none; }
+  #painel.aberto > #resumo { display: none; }
+  #painel.aberto { overflow-y: auto; }
+  #log, #teclas { display: none !important; }
+  .lin { padding: 3px 0; font-size: 12px; }
+  .cfg input, .cfg select { padding: 4px 6px; }
+}
+@media (max-width: 760px) and (orientation: portrait) {
+  #painel.aberto { max-height: calc(100dvh - 44px - 214px); }
+  .pad { bottom: 12px; width: 140px; height: 140px; }
+  .pad.v { width: 84px; height: 140px; }
+  #padL { left: 14px; } #padR { right: 14px; }
+  #garraCtl { left: 8px; right: 8px; bottom: 162px; display: flex !important; gap: 5px; }
+  #garraCtl[style*="none"] { display: none !important; }
+  #garraCtl button { flex: 1; width: auto; height: 42px; font-size: 12px; }
+}
+@media (max-height: 460px) and (orientation: landscape) {
+  #painel { left: auto; width: 230px; right: 8px; }
+  #painel.aberto { max-height: calc(100dvh - 52px); }
+  .pad { bottom: 8px; width: 112px; height: 112px; }
+  .pad.v { width: 70px; height: 112px; }
+  #padL { left: 10px; } #padR { right: 10px; }
+  .pad .rot { display: none; }
+  #garraCtl { right: 96px; bottom: 8px; gap: 5px; }
+  #garraCtl button { width: 66px; height: 40px; font-size: 11px; }
 }
 </style>
 </head>
@@ -140,7 +173,8 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
 <button id="bVolta">◀ SIMULADOR</button>
 
 <aside id="painel">
-  <div id="status">LIVRE</div>
+  <div id="topo"><div id="status">LIVRE</div><button id="bPainel" title="Abrir ou fechar os detalhes">☰</button></div>
+  <div id="resumo">—</div>
   <div class="eixos">
     <div class="eixo" id="eG">GIRO</div>
     <div class="eixo" id="eB">BRAÇO</div>
@@ -862,7 +896,8 @@ function desenha() {
   let t = plano(S.limite, S.alarme ? .16 : .07, '14 8', 2);
   if (S.pre > 0) t += plano(S.limite - S.pre, 0, '3 7', 1, '#D9AE58');
   const lb = proj([-8, -8, S.limite]);
-  t += `<text x="${lb[0]|0}" y="${(lb[1] - 8)|0}" fill="${cor}" font-size="22" font-weight="700" font-family="monospace">LIMITE ${fmt(S.limite)} m</text>`;
+  const lbx = Math.max(VB.x + 8, Math.min(lb[0], VB.x + VB.w - 170));     // no celular a quina do plano fica fora da tela: o rotulo acompanha a vista
+  t += `<text x="${lbx|0}" y="${(lb[1] - 8)|0}" fill="${cor}" font-size="22" font-weight="700" font-family="monospace">LIMITE ${fmt(S.limite)} m</text>`;
   gTeto.innerHTML = t;
 
   // prumo da ponta com a altura
@@ -885,6 +920,7 @@ function painel() {
   $('vHE').textContent = fmt(hE) + ' m';
   $('vHT').textContent = fmt(hT) + ' m';
   $('vP').textContent = fmt(S.pressao, 1) + ' bar';
+  $('resumo').textContent = 'ponta ' + fmt(hT) + ' m · limite ' + fmt(S.limite) + ' m · ' + fmt(S.pressao, 0) + ' bar';
   const ex = EXTRAS[S.modelo];
   if (ex && ex.carga) {                                      // alcance horizontal da ponta e capacidade da tabela do fabricante (interpolada)
     const [, l1, l2] = MODELOS[S.modelo], c = ex.carga, r = (l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2))) * 1000;
@@ -955,6 +991,7 @@ $('bBle').onclick = () => {
   if (ble) { bleEstado('conectando…', ''); log('Saída para o gateway 101 ligada'); bleEnvia(); }
   else { bleEstado('desligada', ''); $('bBle').classList.remove('on'); log('Saída para o gateway 101 desligada'); }
 };
+$('bPainel').onclick = () => $('painel').classList.toggle('aberto');
 $('bTransf').onclick = () => { mostraTransf = !mostraTransf; $('bTransf').classList.toggle('on', mostraTransf); };
 $('bDemo').onclick = alternaDemo;
 $('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; faseDobra = false; log('Estacionando…'); audioLiga(); };
@@ -994,16 +1031,24 @@ $('ensinar').onclick = () => {
 };
 
 // câmera: arrastar e roda
-let drag = null;
-const cena = $('cena');
-cena.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY }; });
+let drag = null, pinca = null;
+const cena = $('cena'), dedos = new Map();
+const dist2 = () => { const [a, b] = [...dedos.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
+cena.addEventListener('pointerdown', e => {
+  dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (dedos.size === 2) { drag = null; pinca = { d0: dist2(), D0: cam.D }; }      // dois dedos: zoom (pinca)
+  else if (dedos.size === 1) drag = { x: e.clientX, y: e.clientY };
+});
 addEventListener('pointermove', e => {
-  if (!drag) return;
+  if (dedos.has(e.pointerId)) dedos.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinca && dedos.size === 2) { cam.D = Math.max(8, Math.min(30, pinca.D0 * pinca.d0 / dist2())); return; }
+  if (!drag || dedos.size !== 1) return;
   cam.az -= (e.clientX - drag.x) * 0.006;
   cam.el = Math.max(rad(2), Math.min(rad(89), cam.el + (e.clientY - drag.y) * 0.005));
   drag = { x: e.clientX, y: e.clientY };
 });
-addEventListener('pointerup', () => drag = null);
+const soltaDedo = e => { dedos.delete(e.pointerId); if (dedos.size < 2) pinca = null; if (dedos.size === 0) drag = null; else if (dedos.size === 1) { const [d] = [...dedos.values()]; drag = { x: d.x, y: d.y }; } };
+addEventListener('pointerup', soltaDedo); addEventListener('pointercancel', soltaDedo);
 cena.addEventListener('wheel', e => { e.preventDefault(); cam.D = Math.max(8, Math.min(30, cam.D * (1 + Math.sign(e.deltaY) * 0.08))); }, { passive: false });
 
 /* ============ Laço ============ */
@@ -1056,6 +1101,26 @@ if (NATIVO) {
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => tag.addEventListener(ev, fimTq));
   }
 }
+// MODO CELULAR: o SVG deixa de ser 16:9 fixo; a regiao util da cena (a maquina com folga) e enquadrada no espaco livre entre
+// o painel (topo) e os controles (base), em retrato e em paisagem.
+const VB = { x: 0, y: 0, w: 1600, h: 900 };
+const ehCelular = () => (innerWidth <= 760 && innerHeight > innerWidth) || (innerHeight <= 460 && innerWidth > innerHeight);
+let eraCelular = null;
+function ajustaVista() {
+  const w = innerWidth, h = innerHeight, cel = ehCelular();
+  if (cel !== eraCelular) {                      // ao entrar/sair do modo celular: transferidores acompanham (poluem a tela pequena)
+    eraCelular = cel; if (cel && mostraTransf) { mostraTransf = false; $('bTransf').classList.remove('on'); }
+  }
+  if (!cel) { Object.assign(VB, { x: 0, y: 0, w: 1600, h: 900 }); cena.setAttribute('viewBox', '0 0 1600 900'); return; }
+  const retrato = h > w;
+  const fx0 = 0, fx1 = retrato ? w : w - 240, fy0 = retrato ? 104 : 44, fy1 = retrato ? h - 214 : h - 6;     // retangulo livre, em px
+  const CW = 540, CH = 520, s = Math.min((fx1 - fx0) / CW, (fy1 - fy0) / CH);                               // regiao util: 540 x 520 unidades, centrada na maquina em repouso
+  const cx = (fx0 + fx1) / 2, cy = (fy0 + fy1) / 2;
+  Object.assign(VB, { x: 715 - cx / s, y: 460 - cy / s, w: w / s, h: h / s });
+  cena.setAttribute('viewBox', `${(715 - cx / s).toFixed(1)} ${(460 - cy / s).toFixed(1)} ${(w / s).toFixed(1)} ${(h / s).toFixed(1)}`);   // (715, 460): centro da maquina no enquadramento padrao
+}
+addEventListener('resize', ajustaVista); addEventListener('orientationchange', () => setTimeout(ajustaVista, 200));
+ajustaVista();
 requestAnimationFrame(quadro);
 </script>
 </body>
