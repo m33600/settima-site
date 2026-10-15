@@ -153,7 +153,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
       <select id="selPre"><option value="0">desligado</option><option value="0.25">0,25</option><option value="0.5" selected>0,50</option><option value="1">1,00</option></select>
     </label>
     <label>Limite (m)
-      <input type="number" id="inLim" min="2" max="9" step="0.05" value="4.75">
+      <input type="number" id="inLim" min="2" max="10" step="0.05" value="4.75">
     </label>
     <label>&nbsp;<button id="bZera">Zerar grua</button></label>
     <button id="bPark" style="grid-column:1/-1">⤓ ESTACIONAR (dobrar lança)</button>
@@ -186,7 +186,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
  *   hPonta    = l0 + l1*sin(t1) + l2*sin(t1 - t2)
  *   alarme se max(hCotovelo, hPonta) >= limite; histerese de 5 cm              */
 // TITAN 6700: folha de especificações do fabricante (A coluna 1770, C braço 3975, D telesc. recolhida 6890; l2 = D − C = 2915, a mesma conta do 8800LI).
-const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390], '8800LI': [1.77, 3.975, 2.795], 'TITAN6700': [1.77, 3.975, 2.915] };
+const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390], '8800LI': [1.77, 3.975, 2.795], 'TITAN6700': [2.838, 3.975, 2.915] };   // Titan: l0 = base 1068 + coluna A 1770, do CHAO (confirmado 2026-10-15; piso da cabine a 2849 no desenho)
 // Dados por modelo além das medidas: rótulo, curso total do giro (graus) e tabela de capacidade [alcance mm, kg] do fabricante.
 // A ORDEM de MODELOS importa: o índice na tabela do núcleo do gateway é a posição aqui (modelo novo sempre no fim).
 // Produto AINDA NÃO lançado não entra aqui: vai num modelos-extras.json servido só pelo gateway local (ver o carregador no fim do script).
@@ -438,7 +438,7 @@ function proj(p) {
 
 const LUZ = norm([-0.4, -0.5, 0.8]);
 const FACES = [[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]];
-function viga(out, p0, p1, w, h, cor) {
+function viga(out, p0, p1, w, h, cor, alfa) {
   const d = sub(p1, p0);
   let up = Math.abs(d[2]) / (Math.hypot(...d) || 1) > 0.97 ? [1, 0, 0] : [0, 0, 1];
   const u = norm(cross(d, up)), v = norm(cross(u, d));
@@ -455,7 +455,7 @@ function viga(out, p0, p1, w, h, cor) {
     if (dot(n, sub(C.pos, fc)) <= 0) continue;               // face de trás
     const s = 0.42 + 0.58 * Math.max(0, dot(n, LUZ));
     const P = pts.map(proj);
-    out.push({ P, z: (P[0][2]+P[1][2]+P[2][2]+P[3][2]) / 4, cor: cor.map(c => Math.min(255, c * s | 0)) });
+    out.push({ P, z: (P[0][2]+P[1][2]+P[2][2]+P[3][2]) / 4, cor: cor.map(c => Math.min(255, c * s | 0)), a: alfa });
   }
 }
 const loc = (ang, x, y, z) => [x*Math.cos(ang) - y*Math.sin(ang), x*Math.sin(ang) + y*Math.cos(ang), z];
@@ -529,22 +529,104 @@ function constroi() {
   const psi = rad(S.giro + GIRO_ZERO), t1 = rad(S.t1), a2 = rad(S.t1 - S.t2);
   const AM = [226, 164, 28], LA = [222, 128, 30], CZ = [150, 155, 150], PT = [38, 40, 36], CH = [72, 80, 86];
 
-  // caminhão
-  viga(f, [-2.4, 0, 0.62], [1.6, 0, 0.62], 1.7, 0.35, CH);
-  viga(f, [1.6, 0, 1.1], [2.5, 0, 1.1], 1.7, 1.4, [205, 207, 200]);        // cabine
-  for (const x of [-1.7, -0.6, 1.8]) for (const y of [-0.95, 0.95])
-    viga(f, [x, y*0.97 - 0.2*Math.sign(y), 0.45], [x, y*0.97 + 0.2*Math.sign(y), 0.45], 0.9, 0.9, PT);
-  // estabilizadores
-  for (const y of [-1, 1]) for (const x of [-1.9, 0.9]) {
-    viga(f, [x, y*0.8, 0.62], [x, y*2.0, 0.62], 0.2, 0.2, CH);
-    viga(f, [x, y*2.0, 0.05], [x, y*2.0, 0.62], 0.2, 0.2, CH);          // apoio do estabilizador (poste estrutural, sem haste)
-    viga(f, [x, y*2.0, 0.0], [x, y*2.0, 0.07], 0.5, 0.5, PT);
+  const TITAN = S.modelo === 'TITAN6700';
+  if (!TITAN) {
+    // caminhão
+    viga(f, [-2.4, 0, 0.62], [1.6, 0, 0.62], 1.7, 0.35, CH);
+    viga(f, [1.6, 0, 1.1], [2.5, 0, 1.1], 1.7, 1.4, [205, 207, 200]);        // cabine
+    for (const x of [-1.7, -0.6, 1.8]) for (const y of [-0.95, 0.95])
+      viga(f, [x, y*0.97 - 0.2*Math.sign(y), 0.45], [x, y*0.97 + 0.2*Math.sign(y), 0.45], 0.9, 0.9, PT);
+    // estabilizadores
+    for (const y of [-1, 1]) for (const x of [-1.9, 0.9]) {
+      viga(f, [x, y*0.8, 0.62], [x, y*2.0, 0.62], 0.2, 0.2, CH);
+      viga(f, [x, y*2.0, 0.05], [x, y*2.0, 0.62], 0.2, 0.2, CH);          // apoio do estabilizador (poste estrutural, sem haste)
+      viga(f, [x, y*2.0, 0.0], [x, y*2.0, 0.07], 0.5, 0.5, PT);
+    }
   }
   // coluna e torre (giram)
   const P0 = [0, 0, l0];
-  viga(f, [0, 0, 0.8], [0, 0, l0 - 0.25], 0.62, 0.62, [92, 98, 102]);
+  viga(f, [0, 0, TITAN ? 1.068 : 0.8], [0, 0, l0 - 0.25], 0.62, 0.62, [92, 98, 102]);
   viga(f, loc(psi, -0.55, 0, l0 - 0.85), loc(psi, 0.1, 0, l0 - 0.85), 0.8, 0.8, [60, 64, 62]);   // contrapeso/cabine do giro (marca o giro)
   viga(f, loc(psi, 0, 0, l0 - 0.3), loc(psi, 0, 0, l0 + 0.1), 0.5, 0.5, [100, 106, 108]);
+
+  // TITAN 6700 (desenho 2D de fabrica, cotas em m). Nao ha caminhao: a coluna gira sobre uma BASE de 1,068 formada por 4 chapas soldadas
+  // (pes de mesa); ao pe da coluna ficam 4 tubos horizontais (os pistoes), FIXOS, que nao giram com ela. A cabine (piso a 2,849, teto a
+  // 4,077, largura 1,02) e a escada (borda externa a 1,608 do eixo) tambem sao FIXAS, atras da maquina, no setor morto de 60 graus que
+  // o curso de 300 deixa livre; "atras" = oposto ao 0 do giro. A escada corre ao lado da cabine, em paralelo, alem do para-brisa, rumo ao 0.
+  if (TITAN) {
+    const zr = rad(GIRO_ZERO), L = (a, b, z) => loc(zr, a, b, z);
+    const ACO = [92, 98, 102], CAB = [236, 237, 232], VID = [40, 60, 76], AMA = [226, 190, 40], DEGRAU = [150, 155, 150], PLAT = [96, 102, 104];
+    const ZB = 1.068, ZT = 4.077;
+    // base: 4 chapas inclinadas (pes de mesa) sob uma chapa de topo
+    viga(f, L(-0.62, 0, ZB - 0.03), L(0.62, 0, ZB - 0.03), 1.24, 0.06, ACO);
+    for (const sa of [-1, 1]) for (const sb of [-1, 1]) {
+      viga(f, L(sa * 0.80, sb * 0.80, 0.02), L(sa * 0.42, sb * 0.42, ZB - 0.06), 0.46, 0.05, [78, 84, 88]);      // chapa-pe
+      viga(f, L(sa * 0.84, sb * 0.84, 0.0), L(sa * 0.84, sb * 0.84, 0.03), 0.62, 0.62, [60, 64, 62]);             // sapata
+    }
+    // pistoes (tubos horizontais ao pe da coluna, fixos), em quadrado
+    for (const sg of [-1, 1]) {
+      viga(f, L(sg * 0.5, -0.36, ZB + 0.2), L(sg * 0.5, 0.36, ZB + 0.2), 0.13, 0.13, [170, 175, 172]);
+      viga(f, L(-0.36, sg * 0.5, ZB + 0.2), L(0.36, sg * 0.5, ZB + 0.2), 0.13, 0.13, [170, 175, 172]);
+    }
+    // quadro sob a plataforma (topo a 2,008): unidade hidraulica e painel eletrico (este do lado OPOSTO ao da escada, borda externa a 0,608 do eixo)
+    const ZQ = 2.008, ZP = 2.075;                    // topo do quadro; piso da cabine = um pouco acima (tampo de 0,1 sobre o quadro)
+    const A0 = -0.65, A1 = -2.572;                   // comprimento da plataforma: 1,922
+    for (const [a, b] of [[A0 - 0.06, -0.55], [A0 - 0.06, 0.6], [A1 + 0.06, -0.55], [A1 + 0.06, 0.6]]) viga(f, L(a, b, 0.0), L(a, b, ZQ), 0.12, 0.12, ACO);
+    for (const z of [0.35, ZQ - 0.1]) for (const b of [-0.55, 0.6]) viga(f, L(A0 - 0.06, b, z), L(A1 + 0.06, b, z), 0.06, 0.06, [78, 84, 88]);   // travessas
+    viga(f, L(-1.25, 0.1, 0.45), L(-2.2, 0.1, 0.45), 0.8, 0.9, [58, 70, 84]);                       // unidade hidraulica
+    viga(f, L(-0.95, -0.35, 0.8), L(-1.35, -0.35, 0.8), 0.45, 1.6, [205, 207, 200]);                // painel eletrico
+    viga(f, L(A0, 0.025, ZQ + 0.025), L(A1, 0.025, ZQ + 0.025), 1.35, 0.1, PLAT);                    // plataforma (tampo do quadro)
+    viga(f, L(-2.1, 1.1, ZQ + 0.025), L(A1, 1.1, ZQ + 0.025), 0.9, 0.1, PLAT);                      // patamar da escada (canto de tras, ao lado da cabine)
+    for (const [a, b] of [[-2.5, 1.45]]) viga(f, L(a, b, 0.0), L(a, b, ZQ), 0.12, 0.12, ACO);
+    // cabine: estrutura fina ("wireframe") envidracada na frente e nas laterais; fechados so o teto, o fundo de tras e o piso.
+    // Acima da linha de 2,849 a cabine e mais funda; abaixo dela o fundo RECUA (perfil de encosto de banco de carro).
+    const ZV = 2.849, ZR = 3.93, AF = -0.78, AL = -1.9, AU = -2.25, W = 0.51;     // frente, fundo baixo, fundo alto, meia-largura
+    const FER = [52, 56, 60], VIDRO = [120, 170, 200];
+    const pil = (a, b, z0, z1) => viga(f, L(a, b, z0), L(a, b, z1), 0.05, 0.05, FER);                 // montante
+    const trl = (a0, b0, a1, b1, z) => viga(f, L(a0, b0, z), L(a1, b1, z), 0.05, 0.05, FER);           // travessa
+    const vid = (a0, b0, a1, b1, z0, z1) => viga(f, L(a0, b0, (z0 + z1) / 2), L(a1, b1, (z0 + z1) / 2), a0 === a1 ? Math.abs(b1 - b0) : 0.012, z1 - z0, VIDRO, 0.2);
+    // fechados: piso, fundos (baixo e alto), fundo do trecho que avanca, teto e climatizador
+    viga(f, L(AF, 0, ZP + 0.025), L(AL, 0, ZP + 0.025), 2 * W, 0.05, [150, 155, 150]);                // piso da cabine
+    viga(f, L(AL, 0, (ZP + ZV) / 2), L(AL - 0.04, 0, (ZP + ZV) / 2), 2 * W, ZV - ZP, CAB);           // fundo baixo (recuado)
+    viga(f, L(AL, 0, ZV), L(AU, 0, ZV), 2 * W, 0.04, CAB);                                           // fundo do trecho que avanca (o "degrau" do banco)
+    viga(f, L(AU, 0, (ZV + ZR) / 2), L(AU - 0.04, 0, (ZV + ZR) / 2), 2 * W, ZR - ZV, CAB);          // fundo alto
+    viga(f, L(AF + 0.04, 0, ZR + 0.03), L(AU - 0.04, 0, ZR + 0.03), 2 * W + 0.1, 0.06, [205, 207, 200]);   // teto
+    viga(f, L(-1.0, 0, ZT - 0.045), L(-2.0, 0, ZT - 0.045), 0.8, 0.09, [170, 175, 172]);             // climatizador (topo a 4,077)
+    // estrutura: montantes e travessas
+    for (const sg of [-1, 1]) {
+      pil(AF, sg * W, ZP, ZR); pil(AU, sg * W, ZV, ZR); pil(AL, sg * W, ZP, ZV);                   // quinas
+      pil(-1.45, sg * W, ZV, ZR);                                                                 // montante intermediario das laterais altas
+      trl(AF, sg * W, AU, sg * W, ZV); trl(AF, sg * W, AU, sg * W, ZR); trl(AF, sg * W, AL, sg * W, ZP + 0.03);   // travessas laterais
+    }
+    trl(AF, -W, AF, W, ZV); trl(AF, -W, AF, W, ZR); trl(AF, -W, AF, W, ZP + 0.03);                 // travessas da frente
+    // vidros: frente (alto e baixo) e laterais (altas e baixas)
+    vid(AF, -W + 0.03, AF, W - 0.03, ZV + 0.03, ZR - 0.03);
+    vid(AF, -W + 0.03, AF, W - 0.03, ZP + 0.06, ZV - 0.03);
+    for (const sg of [-1, 1]) {
+      vid(AF - 0.03, sg * W, AU + 0.03, sg * W, ZV + 0.03, ZR - 0.03);
+      vid(AF - 0.03, sg * W, AL + 0.03, sg * W, ZP + 0.06, ZV - 0.03);
+    }
+    // grade metalica a 100 mm do vidro frontal (do lado de fora, voltada para a maquina)
+    const AG = AF + 0.10, GR = [64, 68, 72];
+    trl(AG, -W + 0.02, AG, W - 0.02, ZP + 0.08); trl(AG, -W + 0.02, AG, W - 0.02, ZR - 0.05);
+    for (let i = 0; i <= 8; i++) { const bb = -W + 0.02 + i * (2 * W - 0.04) / 8; viga(f, L(AG, bb, ZP + 0.08), L(AG, bb, ZR - 0.05), 0.02, 0.02, GR); }   // barras verticais
+    for (let k = 1; k <= 9; k++) { const z = ZP + 0.08 + k * (ZR - 0.05 - ZP - 0.08) / 10; viga(f, L(AG, -W + 0.02, z), L(AG, W - 0.02, z), 0.02, 0.02, GR); }   // barras horizontais
+    // banco do operador, visto atraves do vidro
+    viga(f, L(-1.45, 0, ZP + 0.25), L(-1.75, 0, ZP + 0.25), 0.5, 0.45, [40, 44, 48]);               // assento
+    viga(f, L(-1.8, 0, ZP + 0.6), L(-1.85, 0, ZP + 0.6), 0.5, 0.7, [40, 44, 48]);                    // encosto
+    // escada de degraus, do patamar ate o chao, alem do para-brisa, com corrimao amarelo (borda externa em 1,608 do eixo)
+    const B = 1.25, F0 = -2.1, F1 = 0.6, N = 13;
+    for (let i = 0; i < N; i++) {
+      const t = (i + 0.5) / N, aa = F0 + (F1 - F0) * t, zz = ZP + (0.03 - ZP) * t;
+      viga(f, L(aa - 0.1, B, zz), L(aa + 0.1, B, zz), 0.7, 0.05, DEGRAU);
+    }
+    for (const sg of [-1, 1]) {
+      const b = B + sg * 0.35;
+      viga(f, L(F0, b, ZP - 0.1), L(F1, b, 0.03), 0.05, 0.16, AMA);                                // longarina
+      viga(f, L(F0, b, ZP + 0.9), L(F1, b, 0.93), 0.05, 0.05, AMA);                                // corrimao
+      for (const [aa, zz] of [[F0, ZP], [F1, 0.03]]) viga(f, L(aa, b, zz), L(aa, b, zz + 0.9), 0.05, 0.05, AMA);   // montantes
+    }
+  }
 
   // braço
   const dB = loc(psi, Math.cos(t1), 0, Math.sin(t1));
@@ -685,7 +767,9 @@ function desenha() {
 
   // objetos (algoritmo do pintor)
   f.sort((a, b) => b.z - a.z);
-  gObj.innerHTML = f.map(q => `<polygon points="${q.P.map(pt).join(' ')}" fill="rgb(${q.cor})" stroke="rgba(0,0,0,.35)" stroke-width="1" stroke-linejoin="round"/>`).join('');
+  gObj.innerHTML = f.map(q => q.a != null
+    ? `<polygon points="${q.P.map(pt).join(' ')}" fill="rgb(${q.cor})" fill-opacity="${q.a}" stroke="rgba(170,215,240,.25)" stroke-width="1" stroke-linejoin="round"/>`    // vidro
+    : `<polygon points="${q.P.map(pt).join(' ')}" fill="rgb(${q.cor})" stroke="rgba(0,0,0,.35)" stroke-width="1" stroke-linejoin="round"/>`).join('');
 
   // teto/limite
   const cor = S.alarme ? '#E2574A' : S.pregao ? '#D9AE58' : '#82BC85', corLim = cor;
@@ -799,7 +883,13 @@ $('bVista').onclick = () => {
   $('bVista').textContent = 'Vista: ' + v.n;
 };
 // O que depende do modelo: o curso do giro (300° no TITAN 6700; 420° é o padrão) e a linha de capacidade de carga (só onde há tabela).
+// Limite de altura padrao por modelo: 2,98 m acima do pivo (o 8800LI abre em 4,75 com o pivo a 1,77). So troca se o usuario nao mexeu no limite.
+const LIM_PADRAO = { 'TITAN6700': 5.8 };
+let limPadrao = 4.75;
 function aplicaModelo() {
+  const novoLim = LIM_PADRAO[S.modelo] || 4.75;
+  if (Math.abs(S.limite - limPadrao) < 1e-6) { S.limite = novoLim; $('inLim').value = novoLim.toFixed(2); }
+  limPadrao = novoLim;
   const ex = EXTRAS[S.modelo], total = (ex && ex.giro) || 420;
   GIRO_LIM = [-total / 2, total / 2];
   S.giro = Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], S.giro));
@@ -808,7 +898,7 @@ function aplicaModelo() {
 }
 $('selModelo').onchange = e => { S.modelo = e.target.value; aplicaModelo(); log('Modelo ' + (EXTRAS[S.modelo] && EXTRAS[S.modelo].rotulo || S.modelo)); };
 $('selPre').onchange = e => { S.pre = +e.target.value; };
-$('inLim').onchange = e => { const v = +e.target.value; if (v >= 2 && v <= 9) S.limite = v; e.target.value = S.limite; log('Limite ' + fmt(S.limite) + ' m'); };
+$('inLim').onchange = e => { const v = +e.target.value; if (v >= 2 && v <= 10) S.limite = v; e.target.value = S.limite; log('Limite ' + fmt(S.limite) + ' m'); };
 // Zerar grua = horizontal: braço 0° e lança colinear, a pose em que o tablet pede o ZERAR
 $('bZera').onclick = () => { Object.assign(S, { giro: POSE_PARK.g, t1: 0, t2: 0 }); S.alarme = S.pregao = false; log('Grua zerada'); };
 $('ensinar').onclick = () => {
