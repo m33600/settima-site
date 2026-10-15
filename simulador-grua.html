@@ -75,6 +75,20 @@ button.on { background: var(--accent); color: #1A1200; border-color: var(--accen
 #teclas { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 14px; color: var(--ink-soft); pointer-events: none; }
 kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px; padding: 2px 8px; color: var(--ink); font-size: 13px; }
 
+/* Tela baixa e larga (tablet de 1024x600): painel compacto, sem log nem dica de teclado, joysticks colados na borda de baixo
+   para não cobrirem o painel. O que não cabe rola dentro do painel em vez de sair da tela. */
+@media (min-width: 761px) and (max-height: 680px) {
+  #painel { top: 50px; right: 8px; width: 244px; padding: 8px; max-height: calc(100vh - 62px); overflow-y: auto; }
+  #status { font-size: 20px; padding: 6px; }
+  .eixos { margin: 6px 0 2px; }
+  .eixo { padding: 3px 2px; }
+  .lin { padding: 2px 0; font-size: 12px; }
+  .cfg { margin-top: 6px; gap: 4px; }
+  .cfg input, .cfg select { padding: 3px 5px; }
+  #log, #teclas { display: none; }
+  .pad { bottom: 10px; }
+  .pad.v { height: 120px; }
+}
 @media (max-width: 760px) {
   #painel { top: auto; bottom: 230px; right: 8px; left: 8px; width: auto; }
   #teclas { display: none; }
