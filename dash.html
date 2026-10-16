@@ -201,8 +201,8 @@ body.at #pwliq{background:#ffb020}body.al #pwliq{background:#ff3b47}
   <div id="pwh">CARGA<small id="pwr"></small></div>
   <div id="pwl">--<small>carga líquida</small></div>
   <div id="pwt"><div id="pwtara"></div><div id="pwliq"></div><div id="pwav"><i>85%</i></div><div id="pwmx"><i>máx</i></div></div>
-  <div class="pwn"><span>atual</span> <b id="pwa">--</b></div>
-  <div class="pwn"><span>máx.</span> <b id="pwm">--</b></div>
+  <div class="pwn"><span>máx. líq.</span> <b id="pwm">--</b></div>
+  <div class="pwn"><span>bruto</span> <b id="pwa">--</b></div>
   <div class="pwn"><span>tara</span> <b id="pwtr">--</b></div>
 </div></div>
 <div id="cena"><div id="gg" class="nd"><svg id="gsv" viewBox="4 7 92 96" aria-label="giro"></svg></div><svg id="sv" viewBox="0 0 200 120" preserveAspectRatio="xMidYMid meet"></svg></div>
@@ -793,29 +793,32 @@ function dialGiro(d,gl,gu){
   atualizaOvg();
 }
 function milhar(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
-// CARGA: a coluna da esquerda. A tabela do fabricante vale SEM garra e SEM rotator (d.tr = o peso deles), entao a carga LIQUIDA (leitura menos a
-// tara) e a que se compara com o MAXIMO publicado, e e ela que decide a cor. A barra empilha a tara (cinza) e a liquida (colorida); a marca vermelha
-// fica em tara + maximo, e a ambar em tara + 85% do maximo. Sem peso e sem tabela (outros modelos) a coluna fica apagada, dizendo que nao ha tabela.
+// CARGA: a coluna da esquerda, toda em carga LIQUIDA (o que o operador carrega: a leitura do sensor menos a tara, o peso da garra e do rotator).
+// A tabela do fabricante (d.cm) vale SEM garra e SEM rotator, entao o MAXIMO liquido e a tabela menos a tara (d.cm - d.tr): a liquida e o maximo
+// liquido sao comparaveis, e e essa razao que decide a cor. A barra empilha a tara (cinza) e a liquida (colorida); a marca vermelha fica no
+// maximo (tara + maximo liquido = a propria tabela, no total que o sensor le) e a ambar a 85% do maximo liquido. Sem peso e sem tabela (outros
+// modelos) a coluna fica apagada.
 function carga(d){
   var el=document.getElementById('pw'),$=function(i){return document.getElementById(i);};
   var temPeso=(typeof d.w==='number'),temMax=(typeof d.cm==='number'&&d.cm>0);
   var tr=(typeof d.tr==='number'&&d.tr>0)?d.tr:0, liq=temPeso?Math.max(0,d.w-tr):null;
+  var mliq=temMax?Math.max(0,d.cm-tr):null;                       // maximo LIQUIDO
   el.className=(temPeso||temMax)?'':'nd';
   $('pwr').textContent=(typeof d.ra==='number'&&temMax)?('raio '+d.ra.toFixed(1).replace('.',',')+' m'):'';
   $('pwl').innerHTML=(liq===null?'--':milhar(liq)+'<span style="font-size:.5em"> kg</span>')+'<small>carga líquida</small>';
+  $('pwm').textContent=temMax?milhar(mliq)+' kg':(temPeso?'sem tabela':'--');
   $('pwa').textContent=temPeso?milhar(d.w)+' kg':'--';
-  $('pwm').textContent=temMax?milhar(d.cm)+' kg':(temPeso?'sem tabela':'--');
   $('pwtr').textContent=tr>0?milhar(tr)+' kg':'--';
-  var esc=temMax?(tr+d.cm)*1.2:(temPeso?Math.max(d.w*1.3,1):0);
+  var tot=temMax?tr+mliq:0, esc=temMax?tot*1.2:(temPeso?Math.max(d.w*1.3,1):0);
   function pc(v){return Math.max(0,Math.min(100,esc>0?v/esc*100:0));}
   $('pwtara').style.height=temPeso?pc(Math.min(d.w,tr))+'%':'0';
   var f=$('pwliq'); f.style.bottom=temPeso?pc(Math.min(d.w,tr))+'%':'0';
   f.style.height=temPeso?pc(d.w)-pc(Math.min(d.w,tr))+'%':'0';
-  var r=(temPeso&&temMax)?liq/d.cm:0;
+  var r=(temPeso&&temMax)?(mliq>0?liq/mliq:(liq>0?9:0)):0;       // liquida / maximo liquido (tabela menor que a tara: qualquer carga estoura)
   f.style.background=(temPeso&&temMax)?(r>1?'#ff3b47':(r>=0.85?'#ffb020':'#25c26a')):'#6c8aa6';
   var mx=$('pwmx'),av=$('pwav');
   mx.style.display=temMax?'block':'none'; av.style.display=temMax?'block':'none';
-  if(temMax){mx.style.bottom=pc(tr+d.cm)+'%';av.style.bottom=pc(tr+d.cm*0.85)+'%';}
+  if(temMax){mx.style.bottom=pc(tot)+'%';av.style.bottom=pc(tr+mliq*0.85)+'%';}
 }
 function desenrola(g,gl){
   if(gAnt===null)gU=g;
