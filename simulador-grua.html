@@ -1478,7 +1478,7 @@ fetch('modelos-extras.json').then(r => r.ok ? r.json() : null).then(j => {
 // ?gateway=1 no endereço liga a saída para o gateway 101 sozinha (feira: ninguém precisa clicar)
 if (new URLSearchParams(location.search).has('gateway') || NATIVO) $('bBle').click();
 // No app da grua: DASH abre o painel real (/op, servido pelo próprio app) por cima; o simulador segue rodando por baixo.
-if (!NATIVO && canalDash) {     // versao WEB: o dash (dash.html, a mesma /op do gateway) vem do gateway de mentira acima, por BroadcastChannel
+if (!NATIVO && canalDash && !new URLSearchParams(location.search).has('gateway')) {     // versao WEB (no quiosque com ?gateway=1 o dash e o do tablet; o sim-gateway nao serve dash.html): o dash (dash.html, a mesma /op do gateway) vem do gateway de mentira acima, por BroadcastChannel
   $('bDash').style.display = ''; $('bDashJan').style.display = '';
   const pip = $('pip'), ifr = $('dashPip'), tela = $('pipTela'), fr = $('dash');
   const ajustaPip = () => {            // tamanho da miniatura: ~40% da largura (maximo 440 px; 56% no celular), o dash de 1024x600 escalado por CSS
