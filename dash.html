@@ -111,7 +111,8 @@ body.at #pwliq{background:#ffb020}body.al #pwliq{background:#ff3b47}
 #ens,#ensg{position:relative;overflow:hidden;padding:12px;font-size:12px;font-size:clamp(12px,3.2vw,15px);font-weight:700;
   border:2px solid rgba(255,107,107,0.6);border-radius:10px;background:rgba(255,255,255,0.06);color:#fff;cursor:pointer}
 .segb{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,59,71,0.35)}
-.segl{position:relative}
+.segl{position:relative;display:block;line-height:1.25;text-align:center}
+.segl small{display:block;font-size:.75em;font-weight:600;opacity:.75}
 /* Paisagem: botoes em COLUNA. Aqui, e DEPOIS das regras acima de proposito —
    num bloco anterior elas venciam: "quebrar" jogava o CONFIGURAR para uma
    coluna nova, fora da tela a direita (visto no tablet, 2026-09-25), e a base
@@ -550,8 +551,8 @@ c18 -14 41 -20 80 -20 39 0 62 -6 80 -20 14 -11 31 -20 39 -20 7 0 35 -18 61
 </div>
 <div id="acoes">
   <button id="conf">CONFERIR HORIZONTAL</button>
-  <button id="ens" class="seg"><span class="segb"></span><span class="segl">ENSINAR LIMITE (segure 3 s)</span></button>
-  <button id="ensg" class="seg"><span class="segb"></span><span class="segl">LIMITES DE GIRO (segure 3 s)</span></button>
+  <button id="ens" class="seg"><span class="segb"></span><span class="segl">ENSINAR LIMITE<small>segure 3 s</small></span></button>
+  <button id="ensg" class="seg"><span class="segb"></span><span class="segl">LIMITES DE GIRO<small>segure 3 s</small></span></button>
   <button id="cfg" class="seg"><span class="segb"></span><span class="segl">&#9881; CONFIGURAR (segure 3 s)</span></button>
 </div>
 <div id="pe">—</div>
