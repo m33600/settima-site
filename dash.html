@@ -593,7 +593,7 @@ c18 -14 41 -20 80 -20 39 0 62 -6 80 -20 14 -11 31 -20 39 -20 7 0 35 -18 61
 <style>#cfg{display:none!important}</style>
 <script>
 var SV=document.getElementById('sv');
-var GEO=null;
+var GEO=null,TEMGARRA=false;
 function carregaGeo(){fetch('/geo').then(function(r){return r.json();}).then(function(g){GEO=g;}).catch(function(){});}
 carregaGeo();
 
@@ -651,6 +651,14 @@ function desenharEm(alvo,t1,t2,lim,alarme,guia,pav){
   g+='<line x1="'+ex+'" y1="'+ey+'" x2="'+px+'" y2="'+py+'" stroke="'+cor+'" stroke-width="4" stroke-linecap="round"/>';
   g+='<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#8aa"/>';
   g+='<circle cx="'+px+'" cy="'+py+'" r="3.5" fill="'+cor+'"/>';
+  // Garra (so nos modelos com tara de garra+rotator): rotator (caixinha) pendurado na ponta e duas garras em arco, bem esquema.
+  if(TEMGARRA){
+    var gx=px, gy=py+3.5, gs='stroke="'+cor+'" stroke-linecap="round" fill="none"';
+    g+='<line x1="'+gx+'" y1="'+gy+'" x2="'+gx+'" y2="'+(gy+5)+'" '+gs+' stroke-width="1.2"/>';
+    g+='<rect x="'+(gx-3)+'" y="'+(gy+5)+'" width="6" height="4" rx="1" fill="'+cor+'"/>';
+    g+='<path d="M'+(gx-2)+' '+(gy+9)+' Q'+(gx-6)+' '+(gy+13)+' '+(gx-2.5)+' '+(gy+18)+'" '+gs+' stroke-width="1.6"/>';
+    g+='<path d="M'+(gx+2)+' '+(gy+9)+' Q'+(gx+6)+' '+(gy+13)+' '+(gx+2.5)+' '+(gy+18)+'" '+gs+' stroke-width="1.6"/>';
+  }
   // A ALTURA da ponta, como numero ao lado dela (a barra de altura que havia na coluna da esquerda foi trocada por este numero e pela carga).
   if(lim>0&&!guia){
     var hT=l0+l1*Math.sin(r1)+l2*Math.sin(r2), fim=(px>W*0.62);
@@ -801,6 +809,7 @@ function milhar(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,
 function carga(d){
   var el=document.getElementById('pw'),$=function(i){return document.getElementById(i);};
   var temPeso=(typeof d.w==='number'),temMax=(typeof d.cm==='number'&&d.cm>0);
+  TEMGARRA=(typeof d.tr==='number'&&d.tr>0);
   var tr=(typeof d.tr==='number'&&d.tr>0)?d.tr:0, liq=temPeso?Math.max(0,d.w-tr):null;
   var mliq=temMax?Math.max(0,d.cm-tr):null;                       // maximo LIQUIDO
   el.className=(temPeso||temMax)?'':'nd';
