@@ -337,7 +337,11 @@ ligaPad(document.getElementById('padL'), pad.L);
 ligaPad(document.getElementById('padR'), pad.R);
 
 function leGamepad() {
-  const g = (navigator.getGamepads && [...navigator.getGamepads()].find(x => x));
+  // Varios controles ao mesmo tempo (um PC pode expor ate um mouse como "joystick"): vale o que o operador esta USANDO (botao apertado ou eixo
+  // fora do centro); sem uso, o primeiro com 4 eixos ou mais.
+  const todos = navigator.getGamepads ? [...navigator.getGamepads()].filter(x => x && x.axes.length >= 2) : [];
+  const ativo = x => x.buttons.some(b => b.pressed) || x.axes.some(a => Math.abs(a) > 0.4);
+  const g = todos.find(ativo) || todos.find(x => x.axes.length >= 4) || todos[0];
   if (!g) return { g: 0, b: 0, l: 0, r: 0, a: 0 };
   const z = v => Math.abs(v) < 0.15 ? 0 : v;
   const bt = i => g.buttons[i] && g.buttons[i].pressed ? 1 : 0;
