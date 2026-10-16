@@ -279,7 +279,7 @@ const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390]
 // carga = tabela PUBLICADA pelo fabricante [alcance mm, kg], SEM garra e SEM rotator; tara = o peso dos dois (315 kg no Titan): e a carga da simulacao.
 // massa: ESTIMATIVA (kg) da folha do fabricante (1500 kg "sem link, rotator e base") repartida em coluna 30%, braco 42% e lanca 28%;
 // as setas de forca que dependem dela levam "~". Trocar por dados da fabrica quando houver (massa por parte, pontos dos cilindros).
-const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, tara: 315, massa: { col: 450, braco: 630, lanca: 420 }, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
+const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, tara: 315, raioOff: 0.110, massa: { col: 450, braco: 630, lanca: 420 }, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
 const HIST = 0.05;
 // Giro do 8800LI: 420° de curso, simétrico em volta do zero (±210°), com batente nas duas pontas.
 // O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido a partir do eixo do caminhão (os graus do giro CRESCEM no sentido horário visto de cima, como o azimute do sensor de giro):
@@ -538,10 +538,17 @@ function atualizaPeso(dt) {
   S.pesoLido = Math.max(0, Math.round(S.peso + dinam.trem));
 }
 const pesoKg = () => S.peso === null ? null : S.pesoLido;
+/* RAIO da tabela de carga, em m: l1 cos t1 + l2 cos(t1-t2) + raioOff. A tabela e o grafico de alcance do fabricante medem a distancia nominal de um ponto um
+ * pouco alem da geometria (TITAN 6700: a lanca esticada na horizontal vale EXATAMENTE 7 m = 1250 kg; a conta crua da 6,89). Ajuste do Mario, 2026-10-17. */
+function raioTabela() {
+  const [, l1, l2] = MODELOS[S.modelo], ex = EXTRAS[S.modelo] || {};
+  return l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2)) + (ex.raioOff || 0);
+}
 function cargaMaxKg() {
   const ex = EXTRAS[S.modelo]; if (!ex || !ex.carga) return null;
-  const [, l1, l2] = MODELOS[S.modelo], c = ex.carga, r = (l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2))) * 1000;
-  if (r > c[c.length - 1][0]) return null;                           // alem da tabela
+  const c = ex.carga, r = raioTabela() * 1000;
+  if (r > c[c.length - 1][0] + 10) return null;                     // ate 1 cm alem da ultima linha vale a ultima (a pose esticada cai em cima dela)
+  if (r > c[c.length - 1][0]) return c[c.length - 1][1];                           // alem da tabela
   if (r <= c[0][0]) return c[0][1];                                  // abaixo da primeira linha: vale a primeira (conservador)
   let i = 1; while (c[i][0] < r) i++;
   return c[i - 1][1] + (c[i][1] - c[i - 1][1]) * (r - c[i - 1][0]) / (c[i][0] - c[i - 1][0]);   // a tabela PUBLICADA, sem desconto
@@ -607,7 +614,7 @@ const T0 = performance.now();
 function jsonAllDash() {
   const [l0, l1, l2] = MODELOS[S.modelo], ex = EXTRAS[S.modelo] || {}, h = alturas(), hMax = Math.max(h.hE, h.hT);
   const alarme = S.alarme || S.gEst === 2, cm = cargaMaxKg(), pk = pesoKg();
-  const ra = l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2));
+  const ra = raioTabela();
   const seg = (performance.now() - T0) / 1000;
   return {
     g: +giroSaida().toFixed(2), gm: 1, b: +S.t1.toFixed(2), l: +(S.t1 - S.t2).toFixed(2), p: +S.pressao.toFixed(1), t: +(32 + Math.min(S.pressao, 200) * 0.06).toFixed(1),
@@ -1305,7 +1312,7 @@ function painel() {
   $('resumo').textContent = 'ponta ' + fmt(hT) + ' m · limite ' + fmt(S.limite) + ' m · ' + fmt(S.pressao, 0) + ' bar';
   const ex = EXTRAS[S.modelo];
   if (ex && ex.carga) {                                      // alcance horizontal da ponta e capacidade da tabela do fabricante (interpolada)
-    const [, l1, l2] = MODELOS[S.modelo], c = ex.carga, r = (l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2))) * 1000;
+    const c = ex.carga, r = raioTabela() * 1000;
     const mx = cargaMaxKg();
     const kg = mx === null ? 'fora da tabela' : (r < c[0][0] ? '≥ ' : '') + milhar(mx) + ' kg';
     $('vCap').textContent = fmt(r / 1000, 1) + ' m · ' + kg;
