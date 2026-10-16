@@ -1,0 +1,1028 @@
+<!DOCTYPE html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HFORT</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none}
+/* GRADE POR AREAS, nao por DOM: a mesma pagina serve o tablet deitado na
+   cabine (paisagem, tres colunas) e o celular em pe (retrato, duas colunas).
+   Mudar so a grade, e nao a ordem dos elementos, mantem um HTML so. */
+body{background:#0d1a12;color:#eaf5ee;transition:background .25s;padding:12px;
+  display:grid;grid-gap:10px 14px;grid-template-columns:24% 1fr;grid-template-rows:1fr auto auto auto;
+  grid-template-areas:"tubo cena" "tubo bloco" "tubo acoes" "inst pe"}
+body.at{background:#3a2a06}body.al{background:#4a0d12}
+body.na{background:#1a1a1d}
+/* CARGA (coluna da esquerda): onde estava a barra de ALTURA, que repetia o desenho da pose e o numero da folga. Agora a coluna e do PESO:
+   a carga liquida em destaque, uma barra com a tara (garra + rotator, cinza) embaixo e a carga liquida (colorida) em cima, a marca do MAXIMO
+   publicado (vermelha) e a de atencao a 85% dele (ambar); embaixo, atual / maximo / tara em kg. A altura virou NUMERO, na ponta do desenho. */
+#ctubo{grid-area:tubo;display:flex;min-height:0}
+#pw{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;padding:8px 6px;background:rgba(0,0,0,0.33);
+  border:2px solid rgba(255,255,255,0.2);border-radius:8px;text-align:center}
+#pw.nd #pwt,#pw.nd .pwn{opacity:.35}
+#pwh{font-size:12px;font-size:clamp(11px,3vw,15px);font-weight:700;letter-spacing:.08em;opacity:.85;line-height:1.1}
+#pwh small{display:block;font-size:.8em;font-weight:600;letter-spacing:0;opacity:.85}
+#pwl{font-size:26px;font-size:clamp(20px,6.4vw,38px);font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+#pwl small{display:block;font-size:.4em;font-weight:600;opacity:.8;margin-top:3px;letter-spacing:.04em}
+#pwt{flex:1;min-height:60px;position:relative;margin:2px 22% 0;background:rgba(0,0,0,0.4);border:2px solid rgba(255,255,255,0.2);border-radius:6px}
+#pwtara,#pwliq{position:absolute;left:0;right:0;transition:height .25s,bottom .25s,background .25s}
+#pwtara{bottom:0;height:0;background:rgba(150,160,170,0.55);border-radius:0 0 4px 4px}
+#pwliq{bottom:0;height:0;background:#25c26a}
+#pwmx{position:absolute;left:-10px;right:-10px;height:0;border-top:3px solid #ff3b47;display:none}
+#pwav{position:absolute;left:-10px;right:-10px;height:0;border-top:3px dashed #ffb020;display:none}
+#pwmx i,#pwav i{position:absolute;left:100%;margin-left:3px;font-style:normal;font-size:10px;font-size:clamp(9px,2.3vw,12px);font-weight:700;
+  line-height:1;transform:translateY(-50%);white-space:nowrap}
+#pwmx i{color:#ff6b6b}#pwav i{color:#ffb020}
+.pwn{font-size:12px;font-size:clamp(10px,2.8vw,15px);font-variant-numeric:tabular-nums;line-height:1.2}
+.pwn b{font-weight:800}
+.pwn span{opacity:.75}
+body.at #pwliq{background:#ffb020}body.al #pwliq{background:#ff3b47}
+/* Retrato: o bloco cresce com o conteudo e comeca no topo. Centralizado e
+   podendo encolher, ele invadia o desenho e os botoes de baixo quando a tela
+   de calibracao acrescentava os ZERAR (visto no S200, 2026-09-25). */
+#bloco{grid-area:bloco;display:flex;flex-direction:column;justify-content:flex-start}
+/* O desenho da pose. Serve o dia inteiro para entender a situacao de relance,
+   e na CALIBRACAO vira a verificacao: depois de zerar, braco e lanca tem de
+   aparecer na horizontal. Se nao aparecerem, o zero pegou errado — e isso e
+   invisivel em qualquer numero. */
+#cena{grid-area:cena;min-height:120px;background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.13);
+  border-radius:8px}
+#cena svg{width:100%;height:100%;display:block;overflow:hidden}
+/* A folga APOIA a pose, nao compete com ela (pedido do Mario, 2026-09-25):
+   o desenho da grua e o que se le de relance; a folga confirma, numa linha so
+   — "LIVRE  1,5 m ate o limite". */
+#linha{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 .45em;line-height:1.1}
+#est{font-size:20px;font-size:clamp(18px,5.5vw,30px);font-weight:800;letter-spacing:.04em}
+#folga,#un{display:inline}
+#folga{font-size:34px;font-size:clamp(30px,10vw,52px);font-weight:800;font-variant-numeric:tabular-nums}
+#un{font-size:16px;font-size:clamp(15px,4.5vw,24px);font-weight:600;opacity:.85;margin-left:-.3em}
+#rot{font-size:12px;font-size:clamp(12px,3.4vw,18px);opacity:.9}
+#pe{grid-area:pe;align-self:end;font-size:11px;font-size:clamp(11px,3vw,15px);opacity:.85}
+/* GIRO: um dial analogico DENTRO do cartao da pose, no espaco vazio a esquerda do desenho. A pose e vista de lado e nao mostra para onde a torre
+   aponta; o dial mostra, de relance, a posicao em relacao ao zero (no alto), com o curso inteiro do modelo em 300 graus de mostrador, as zonas
+   dos limites programados (vermelho = trava, ambar = aviso) e o numero no centro. O gateway entrega o giro em -180..+180. */
+#cena{display:flex;align-items:stretch}
+#gg{flex:0 0 34%;min-width:0;display:flex;align-items:center;justify-content:center;padding:4px 0 4px 6px}
+#gg.nd svg{opacity:.4}
+#cena #gg svg{width:100%;height:auto;max-height:100%;display:block;overflow:visible}
+#cena #sv{flex:1;min-width:0;width:auto;height:100%}
+#cal{display:none;gap:10px;margin-top:14px;flex-wrap:wrap}
+#cal.on{display:flex}
+#cal button{flex:1;min-width:100px;padding:16px 10px;font-size:13px;font-size:clamp(13px,3.6vw,17px);
+  font-weight:700;border:2px solid rgba(255,255,255,0.33);border-radius:10px;background:rgba(255,255,255,0.08);
+  color:#fff;cursor:pointer}
+#cal button.ok{border-color:#25c26a;background:rgba(37,194,106,0.13);opacity:.6}
+#conf{margin-top:12px;padding:12px;font-size:12px;font-size:clamp(12px,3.2vw,15px);font-weight:700;
+  border:2px solid rgba(255,255,255,0.27);border-radius:10px;background:rgba(255,255,255,0.06);color:#fff;cursor:pointer}
+#ov{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(11,17,22,0.95);display:none;flex-direction:column;
+  padding:18px;gap:10px;z-index:9}
+#ov.on{display:flex}
+#ov h2{font-size:17px;font-size:clamp(16px,4.6vw,24px);line-height:1.2}
+#ov p{font-size:12px;font-size:clamp(12px,3.2vw,16px);opacity:.8;line-height:1.4}
+#ovsv{flex:1;min-height:100px;background:rgba(0,0,0,0.33);border:1px solid rgba(255,255,255,0.13);border-radius:8px}
+#ovsv svg{width:100%;height:100%;display:block;overflow:hidden}
+#ver{font-size:14px;font-size:clamp(14px,4vw,20px);font-weight:800;padding:10px;border-radius:8px;text-align:center}
+#ver.ok{background:rgba(37,194,106,0.13);color:#7ee2a8;border:2px solid #25c26a}
+#ver.no{background:rgba(255,59,71,0.13);color:#ff9aa2;border:2px solid #ff3b47}
+#ovb{display:flex;gap:10px}
+#ovb button{flex:1;padding:14px;font-size:13px;font-size:clamp(13px,3.4vw,16px);font-weight:700;
+  border-radius:10px;border:2px solid rgba(255,255,255,0.27);background:rgba(255,255,255,0.07);color:#fff;cursor:pointer}
+.piscar{animation:p .7s steps(1,end) infinite}
+@keyframes p{50%{opacity:.35}}
+/* Instrumentos: pressao em PONTEIRO (le-se de relance, com a maquina em
+   movimento), temperatura e horimetro em texto. Sensor ausente mostra "--" e
+   nenhum ponteiro: ponteiro em zero pareceria leitura boa. */
+#logo{display:block;margin:0 auto 8px;height:auto;width:60%;max-width:110px;max-height:12vh}
+#inst{grid-area:inst;display:flex;flex-direction:column;text-align:center;min-height:0}
+#pg{width:100%;height:auto;max-height:22vh;display:block}
+#pv{font-size:20px;font-size:clamp(18px,5vw,30px);font-weight:800;font-variant-numeric:tabular-nums}
+.il{font-size:14px;font-size:clamp(13px,3.6vw,18px);opacity:.9;margin-top:4px;font-variant-numeric:tabular-nums}
+#acoes{grid-area:acoes;display:flex;gap:10px}
+#acoes button{flex:1;margin-top:0}
+/* ENSINAR so dispara SEGURANDO 3 s: esta tela vive na cabine, e toque de
+   luva com a maquina tremendo nao pode trocar o limite. A barra enche enquanto
+   segura — e o que diz ao operador que o gesto esta funcionando. */
+/* CONFIGURAR: o caminho para o painel do tecnico. Esta tela abre na janela
+   "Fazer login em GATEWAY-xxx" do Android (portal cativo), que nao tem barra
+   de endereco — sem este botao o painel era inalcancavel do tablet. Fino e
+   em linha propria: e raro, e nao pode competir com os de operacao. */
+#acoes{flex-wrap:wrap}
+#acoes #cfg{flex:1 1 100%;position:relative;overflow:hidden;padding:8px;font-size:11px;font-weight:700;
+  border:1px solid rgba(255,255,255,0.2);border-radius:10px;background:rgba(255,255,255,0.04);color:#aab}
+#ens,#ensg{position:relative;overflow:hidden;padding:12px;font-size:12px;font-size:clamp(12px,3.2vw,15px);font-weight:700;
+  border:2px solid rgba(255,107,107,0.6);border-radius:10px;background:rgba(255,255,255,0.06);color:#fff;cursor:pointer}
+.segb{position:absolute;left:0;top:0;bottom:0;width:0;background:rgba(255,59,71,0.35)}
+.segl{position:relative}
+/* Paisagem: botoes em COLUNA. Aqui, e DEPOIS das regras acima de proposito —
+   num bloco anterior elas venciam: "quebrar" jogava o CONFIGURAR para uma
+   coluna nova, fora da tela a direita (visto no tablet, 2026-09-25), e a base
+   de 100% dele virava 100% da ALTURA. */
+@media (orientation:landscape){
+  #acoes{flex-wrap:nowrap}
+  #acoes #cfg{flex:0 0 auto}
+}
+#ove{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(11,17,22,0.96);display:none;flex-direction:column;
+  justify-content:center;align-items:center;padding:18px;gap:14px;z-index:9;text-align:center}
+#ove.on{display:flex}
+#ove h2{font-size:18px;font-size:clamp(17px,5vw,28px)}
+#ove p{font-size:12px;font-size:clamp(12px,3.2vw,16px);opacity:.8;line-height:1.4;max-width:560px}
+#ovg{position:fixed;top:0;right:0;bottom:0;left:0;background:rgba(11,17,22,0.96);display:none;flex-direction:column;
+  justify-content:center;align-items:center;padding:18px;gap:12px;z-index:9;text-align:center}
+#ovg.on{display:flex}
+#ovg h2{font-size:18px;font-size:clamp(17px,5vw,28px)}
+#ovg p{font-size:12px;font-size:clamp(12px,3.2vw,16px);opacity:.8;line-height:1.4;max-width:560px}
+#ovgs{display:flex;gap:18px;font-size:13px;font-size:clamp(13px,3.6vw,18px);flex-wrap:wrap;justify-content:center}
+#ovgs b{font-size:1.5em;font-variant-numeric:tabular-nums;display:block}
+#ovgb,#ovgb2,#ovgp{display:flex;gap:10px;width:100%;max-width:560px;align-items:center;justify-content:center}
+#ovg button{flex:1;padding:16px 8px;font-size:14px;font-weight:700;border-radius:10px;
+  border:2px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer}
+#ovg #ovgpm,#ovg #ovgpp{flex:0 0 64px;height:64px;font-size:30px;padding:0}
+#ovgpv{font-size:30px;font-size:clamp(26px,8vw,46px);font-weight:800;color:#ffb020;min-width:120px;font-variant-numeric:tabular-nums}
+#ovg #ovgn,#ovg #ovgp2{border-color:#ff6b6b}
+#pavr{display:flex;align-items:center;gap:14px}
+#pavr button{width:64px;height:64px;font-size:30px;border-radius:12px;border:2px solid rgba(255,255,255,0.3);
+  background:rgba(255,255,255,0.08);color:#fff}
+#pavv{font-size:34px;font-size:clamp(30px,9vw,54px);font-weight:800;color:#ffb020;min-width:130px;
+  font-variant-numeric:tabular-nums}
+#oveb{display:flex;gap:10px;width:100%;max-width:560px}
+#oveb button{flex:1;padding:16px;font-size:14px;font-weight:700;border-radius:10px;
+  border:2px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.08);color:#fff}
+#oveb #pavok{border-color:#25c26a;background:rgba(37,194,106,0.2)}
+/* No FIM de proposito: regras de mesmo peso que vem depois vencem, e com este
+   bloco no comeco os tamanhos de paisagem nunca valiam (2026-09-25). */
+/* PAISAGEM: tubo estreito a esquerda, pose e folga no centro (o que se le de
+   relance fica no meio do campo de visao), instrumentos e botoes a direita. */
+@media (orientation:landscape){
+  /* O desenho fica com TODO o espaco que sobra (1fr); a linha do estado e o rodape so com o que precisam. Os botoes (que eram uma coluna
+     inteira a direita e seguravam a altura da linha de baixo) viram UMA FILEIRA no pe da tela, embaixo do desenho e dos instrumentos:
+     assim o cartao da pose ganha toda a altura que sobra. */
+  body{grid-template-columns:17% 1fr 26%;grid-template-rows:1fr auto auto;
+    grid-template-areas:"tubo cena inst" "tubo bloco pe" "tubo acoes acoes"}
+  #folga{font-size:7vh}
+  #est{font-size:4.5vh}
+  #un{font-size:3.5vh}
+  #rot{font-size:2.8vh}
+  #inst{justify-content:center}
+  #pg{max-height:44vh}
+  #pv{font-size:6.5vh}
+  .il{font-size:3.6vh}
+  #acoes{flex-direction:row;margin-top:0}
+  #acoes button{padding:10px 8px}
+  #pe{align-self:end;text-align:right}
+}
+</style></head><body>
+<div id="ov">
+  <h2>Conferência da horizontal</h2>
+  <p>Ponha o <b>braço</b> e a <b>lança</b> na horizontal. O desenho abaixo tem que
+     mostrar os dois deitados — se não mostrar, o zero está errado e a altura
+     calculada não vale.</p>
+  <div id="ovsv"><svg id="sv2" viewBox="0 0 200 120" preserveAspectRatio="xMidYMid meet"></svg></div>
+  <div id="ver">—</div>
+  <p id="vertxt"></p>
+  <div id="ovb"><button id="ovf">FECHAR</button><button id="ovr">ZERAR BRAÇO E LANÇA</button></div>
+</div>
+<div id="ove">
+  <h2 id="oveh">LIMITE GRAVADO</h2>
+  <p>Agora o PRÉ-AVISO: a quantos metros ANTES do limite o buzzer começa a bipar.
+     Bipe não trava nada — só avisa que está chegando.</p>
+  <div id="pavr"><button id="pavm">&minus;</button><div id="pavv">--</div><button id="pavp">+</button></div>
+  <p id="pavtxt"></p>
+  <div id="oveb"><button id="pavno">MANTER O ANTERIOR</button><button id="pavok">CONFIRMAR</button></div>
+</div>
+<div id="ovg">
+  <h2>LIMITES DE GIRO</h2>
+  <p>Leve o giro até onde você quer o limite e <b>grave</b>. Perto dele o buzzer avisa; passando, o giro <b>TRAVA</b>
+     (pulsado: dá para voltar). Um limite para cada lado.</p>
+  <div id="ovgs"><div>posição atual<b id="ovga">--</b></div><div>limite &minus;<b id="ovgvn">--</b></div><div>limite +<b id="ovgvp">--</b></div></div>
+  <div id="ovgb"><button id="ovgn">GRAVAR AQUI COMO LIMITE &minus;</button><button id="ovgp2">GRAVAR AQUI COMO LIMITE +</button></div>
+  <div id="ovgp"><span>aviso antes do limite</span><button id="ovgpm">&minus;</button><div id="ovgpv">--</div><button id="ovgpp">+</button></div>
+  <div id="ovgb2"><button id="ovgl">APAGAR OS LIMITES</button><button id="ovgf">FECHAR</button></div>
+</div>
+<div id="ctubo"><div id="pw" class="nd">
+  <div id="pwh">CARGA<small id="pwr"></small></div>
+  <div id="pwl">--<small>carga líquida</small></div>
+  <div id="pwt"><div id="pwtara"></div><div id="pwliq"></div><div id="pwav"><i>85%</i></div><div id="pwmx"><i>máx</i></div></div>
+  <div class="pwn"><span>atual</span> <b id="pwa">--</b></div>
+  <div class="pwn"><span>máx.</span> <b id="pwm">--</b></div>
+  <div class="pwn"><span>tara</span> <b id="pwtr">--</b></div>
+</div></div>
+<div id="cena"><div id="gg" class="nd"><svg id="gsv" viewBox="4 7 92 96" aria-label="giro"></svg></div><svg id="sv" viewBox="0 0 200 120" preserveAspectRatio="xMidYMid meet"></svg></div>
+<div id="bloco">
+  <div id="linha"><span id="est">—</span><span id="folga">--</span><span id="un"> m</span><span id="rot">até o limite</span></div>
+  <div id="cal"><button id="cb">ZERAR BRAÇO</button><button id="cl">ZERAR LANÇA</button></div>
+</div>
+<div id="inst">
+  <!-- Logotipo HFORT (SVG de hfort.com.br): escudo vermelho e nome em branco,
+       feito para fundo escuro. -->
+  <svg id="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1840" role="img" aria-label="HFORT">
+<g transform="translate(0,1840) scale(0.1,-0.1)">
+<path fill="#960104" d="M1570 17941 c-14 -27 -14 -2975 0 -3002 6 -10 19 -19 30 -19 26 0 40
+-29 40 -85 0 -25 7 -57 16 -70 15 -23 15 -27 0 -50 -14 -22 -16 -135 -16
+-1210 0 -1221 0 -1225 -40 -1225 -11 0 -24 -9 -30 -19 -16 -31 -14 -4182 3
+-4204 8 -11 30 -17 71 -19 44 -2 61 -7 67 -21 5 -9 13 -25 18 -35 6 -12 24
+-18 71 -22 47 -4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 47
+-4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 47 -4 65 -10 71
+-22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 64 -5 65 -6 90 -60 5 -10 28 -17
+70 -20 47 -4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 47 -4 65
+-10 71 -23 5 -9 13 -25 18 -35 6 -12 24 -18 71 -22 47 -4 65 -10 71 -23 5 -9
+13 -25 18 -35 6 -12 24 -18 71 -22 47 -4 65 -10 71 -22 5 -10 13 -26 18 -35 6
+-13 24 -19 71 -23 42 -3 65 -10 70 -20 25 -54 26 -55 90 -60 64 -5 65 -6 90
+-60 5 -10 28 -17 70 -20 47 -4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24
+-19 71 -23 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 64 -5 65 -6 90 -60 5 -10
+28 -17 70 -20 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 47 -4 65 -10 71 -22 5
+-10 13 -26 18 -35 6 -13 24 -19 71 -23 47 -4 65 -10 71 -22 5 -10 13 -26 18
+-35 6 -13 24 -19 71 -23 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 42 -3 65 -10
+70 -20 25 -54 26 -55 90 -60 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 42 -3 65
+-10 70 -20 25 -54 26 -55 90 -60 42 -3 65 -10 70 -20 25 -54 26 -55 90 -60 47
+-4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 64 -5 65 -6 90 -60
+5 -10 28 -17 70 -20 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 42 -3 65 -10 70
+-20 25 -54 26 -55 90 -60 42 -3 65 -10 70 -20 25 -54 26 -55 90 -60 47 -4 65
+-10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 47 -4 65 -10 71 -22 5
+-10 13 -26 18 -35 6 -13 24 -19 71 -23 64 -5 65 -6 90 -60 25 -53 150 -17 150
+43 0 19 13 45 40 77 l40 48 0 173 c0 157 2 176 20 199 11 14 20 32 20 40 0 8
+9 26 20 40 16 20 20 41 20 113 0 96 10 127 40 127 30 0 40 31 40 127 0 72 4
+93 20 113 11 14 20 32 20 40 0 8 9 26 20 40 15 20 20 41 20 99 0 71 1 75 40
+121 34 41 40 55 40 95 0 56 14 85 40 85 28 0 40 30 40 105 0 64 2 70 40 115
+34 41 40 55 40 95 0 56 14 85 40 85 25 0 40 29 40 80 0 51 15 80 40 80 25 0
+40 29 40 80 0 50 14 80 38 80 22 0 42 19 42 38 0 8 18 36 40 62 25 30 40 58
+40 75 0 37 17 65 40 65 26 0 40 29 40 82 0 48 15 74 44 80 10 1 23 11 27 21 5
+9 13 25 18 35 4 9 17 19 27 20 29 6 44 32 44 80 0 52 14 82 39 82 21 0 37 17
+42 44 2 10 12 23 22 27 9 5 25 13 35 18 9 4 19 17 21 27 2 10 21 40 42 65 26
+31 39 57 39 76 0 34 17 60 44 65 10 1 23 11 27 21 5 9 13 25 17 34 5 10 19 20
+32 23 13 3 27 13 32 23 4 9 12 25 17 35 4 9 17 19 27 20 30 6 44 32 44 83 0
+67 31 97 64 63 12 -12 16 -37 16 -103 0 -91 9 -117 44 -123 10 -1 23 -11 27
+-20 5 -10 13 -26 17 -35 5 -10 19 -20 32 -23 13 -3 27 -13 32 -23 4 -9 12 -25
+16 -34 5 -10 19 -20 32 -23 13 -3 27 -13 32 -23 4 -9 12 -25 17 -34 4 -10 17
+-20 27 -21 30 -6 44 -32 44 -82 0 -50 14 -76 44 -82 10 -1 23 -11 27 -20 5
+-10 13 -26 18 -35 4 -10 17 -20 27 -21 30 -6 44 -32 44 -82 0 -50 14 -76 44
+-82 10 -1 23 -11 27 -20 5 -10 13 -26 18 -35 4 -10 17 -20 27 -21 29 -6 44
+-32 44 -80 0 -53 14 -82 40 -82 25 0 40 -29 40 -80 0 -50 14 -80 38 -80 22 0
+42 -19 42 -38 0 -8 18 -36 40 -62 25 -30 40 -58 40 -75 0 -37 17 -65 40 -65
+26 0 40 -29 40 -87 0 -32 7 -56 20 -73 11 -14 20 -32 20 -40 0 -8 9 -26 20
+-40 13 -17 20 -41 20 -73 0 -58 14 -87 40 -87 25 0 40 -29 40 -80 0 -51 15
+-80 40 -80 30 0 40 -31 40 -120 0 -89 10 -120 40 -120 30 0 40 -31 40 -120 0
+-89 10 -120 40 -120 32 0 40 -33 40 -160 0 -127 8 -160 40 -160 32 0 40 -33
+40 -160 0 -127 8 -160 40 -160 33 0 40 -33 40 -200 0 -92 4 -170 10 -181 15
+-27 114 -27 150 1 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26
+9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40
+26 22 54 40 61 40 8 0 25 9 39 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 40
+20 59 20 24 0 46 11 81 40 34 29 57 40 80 40 23 0 46 11 80 40 26 22 54 40 61
+40 8 0 25 9 39 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26
+9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9 40 20
+14 11 32 20 40 20 8 0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40 34 29
+57 40 80 40 23 0 46 11 80 40 26 22 54 40 61 40 8 0 25 9 39 20 14 11 32 20
+40 20 8 0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40 34 29 57 40 80 40
+23 0 46 11 80 40 34 29 57 40 80 40 23 0 46 11 80 40 34 29 57 40 80 40 23 0
+46 11 80 40 34 29 57 40 80 40 23 0 46 11 80 40 34 29 57 40 80 40 23 0 46 11
+80 40 34 29 57 40 80 40 23 0 46 11 80 40 34 29 57 40 80 40 23 0 46 11 80 40
+26 22 54 40 61 40 8 0 25 9 39 20 14 11 31 20 38 20 8 0 26 9 41 19 18 13 48
+21 86 23 43 2 60 7 66 21 5 9 13 25 18 35 5 11 22 18 46 20 28 2 53 15 86 43
+33 28 56 39 79 39 23 0 46 11 79 39 42 35 55 40 106 43 43 2 60 7 66 21 5 9
+13 25 18 35 5 11 22 18 46 20 28 2 53 15 85 42 41 34 54 39 105 42 43 2 60 7
+66 21 5 9 13 25 18 35 6 12 24 18 71 22 47 4 65 10 71 23 5 9 13 25 18 35 6
+12 24 18 71 22 42 3 65 10 70 20 23 51 28 55 65 58 28 2 53 15 86 43 34 29 56
+39 81 39 25 0 42 8 66 33 l32 33 0 2111 c0 2209 1 2143 -36 2143 -28 0 -44
+-25 -44 -68 0 -56 -14 -86 -30 -62 -6 10 -10 459 -10 1258 0 1128 -1 1245 -16
+1267 -16 24 -15 27 20 69 36 44 36 45 36 138 0 77 4 97 20 118 11 14 20 32 20
+40 0 8 9 26 20 40 23 29 32 2739 10 2781 -17 30 -13163 30 -13180 0z m7584
+-3617 c11 -27 7 -1478 -4 -1494 -27 -40 -30 35 -30 747 0 697 2 763 20 763 4
+0 11 -7 14 -16z m-3544 -294 c42 -28 -52 -30 -1450 -30 -1398 0 -1492 2 -1450
+30 10 6 525 10 1450 10 925 0 1440 -4 1450 -10z m8000 0 c42 -28 -52 -30
+-1450 -30 -1398 0 -1492 2 -1450 30 10 6 525 10 1450 10 925 0 1440 -4 1450
+-10z"/>
+<path fill="#960104" d="M770 3821 c-14 -27 -14 -3295 0 -3322 10 -18 25 -19 366 -19 312 0
+358 -2 380 -16 24 -16 26 -16 54 11 l30 29 0 376 0 376 33 32 33 32 397 0
+c382 0 397 -1 407 -19 6 -13 10 -157 10 -401 0 -244 4 -388 10 -401 10 -18 24
+-19 288 -19 260 0 279 -2 302 -20 30 -24 49 -25 78 -5 17 12 26 13 42 5 17 -9
+27 -8 45 4 14 9 31 16 39 16 36 0 36 21 36 1680 0 1112 -3 1648 -10 1661 -17
+30 -803 30 -820 0 -7 -13 -10 -290 -10 -828 l0 -809 -33 -32 -33 -32 -295 0
+c-249 0 -298 2 -317 15 -17 12 -26 13 -42 5 -16 -8 -25 -7 -42 5 -13 8 -39 15
+-60 15 -60 0 -58 -32 -58 840 0 533 -3 808 -10 821 -10 18 -25 19 -410 19
+-385 0 -400 -1 -410 -19z"/>
+<path fill="#960104" d="M3770 3821 c-14 -27 -14 -3295 0 -3322 6 -10 17 -19 26 -19 8 0 26
+-7 39 -16 23 -15 27 -15 50 0 40 26 440 23 475 -4 18 -14 41 -20 80 -20 39 0
+62 6 80 20 14 11 33 20 42 20 35 0 38 32 38 420 0 244 4 388 10 401 10 18 26
+19 428 19 431 0 442 1 442 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20
+40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14
+20 32 20 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 32 20
+40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 31 20 38 0 8 10
+27 21 44 31 43 14 78 -38 78 -22 0 -48 9 -63 20 -18 14 -41 20 -80 20 -39 0
+-62 -6 -80 -20 -23 -18 -42 -20 -240 -20 -198 0 -217 2 -240 20 -35 27 -125
+27 -160 0 -18 -14 -41 -20 -80 -20 -39 0 -62 6 -80 20 -31 24 -49 25 -79 4
+-21 -15 -24 -15 -52 12 l-29 28 0 389 c0 248 4 395 10 408 10 19 29 19 730 19
+701 0 720 0 730 19 6 13 10 157 10 401 0 244 -4 388 -10 401 -17 30 -2283 30
+-2300 0z"/>
+<path fill="#960104" d="M7760 3820 c-20 -15 -41 -20 -100 -20 -59 0 -80 -5 -100 -20 -14 -11
+-41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9
+-60 -20 -14 -11 -32 -20 -40 -20 -8 0 -26 -9 -40 -20 -14 -11 -31 -20 -39 -20
+-7 0 -35 -18 -61 -40 -26 -22 -54 -40 -61 -40 -8 0 -43 -27 -79 -60 -36 -33
+-73 -60 -82 -60 -21 0 -198 -177 -198 -198 0 -9 -27 -46 -60 -82 -33 -36 -60
+-71 -60 -79 0 -7 -18 -35 -40 -61 -22 -26 -40 -54 -40 -61 0 -8 -9 -25 -20
+-39 -11 -14 -20 -32 -20 -40 0 -8 -9 -26 -20 -40 -11 -14 -20 -41 -20 -60 0
+-19 -9 -46 -20 -60 -11 -14 -20 -32 -20 -40 0 -8 -9 -26 -20 -40 -15 -20 -20
+-41 -20 -100 0 -59 -5 -80 -20 -100 -18 -23 -20 -42 -20 -280 0 -238 2 -257
+20 -280 15 -20 20 -41 20 -100 0 -59 5 -80 20 -100 11 -14 20 -41 20 -60 0
+-19 9 -46 20 -60 11 -14 20 -32 20 -40 0 -8 9 -26 20 -40 11 -14 20 -40 20
+-59 0 -24 11 -46 40 -81 22 -26 40 -53 40 -60 0 -7 18 -34 40 -60 22 -26 40
+-55 40 -63 0 -22 376 -397 398 -397 9 0 28 -9 42 -20 14 -11 31 -20 39 -20 7
+0 35 -18 61 -40 26 -22 54 -40 61 -40 8 0 25 -9 39 -20 14 -11 41 -20 60 -20
+19 0 46 -9 60 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 18 -14 41 -20 80
+-20 39 0 62 -6 80 -20 24 -19 43 -20 380 -20 337 0 356 1 380 20 18 14 41 20
+80 20 39 0 62 6 80 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8
+0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40 26 22 53 40 60 40 7 0 34 18
+60 40 26 22 55 40 63 40 21 0 317 296 317 317 0 8 18 37 40 63 22 26 40 53 40
+60 0 7 18 34 40 60 29 35 40 57 40 81 0 19 9 45 20 59 11 14 20 32 20 40 0 8
+9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 14 18 20 41 20 80 0 39 6 62 20
+80 17 21 20 41 20 140 0 99 3 119 20 140 16 21 20 41 20 120 0 79 -4 99 -20
+120 -16 21 -20 41 -20 120 0 79 -4 99 -20 120 -14 18 -20 41 -20 80 0 39 -6
+62 -20 80 -11 14 -20 41 -20 60 0 19 -9 46 -20 60 -11 14 -20 32 -20 40 0 8
+-9 26 -20 40 -11 14 -20 32 -20 40 0 8 -9 26 -20 40 -11 14 -20 31 -20 39 0 7
+-18 35 -40 61 -22 26 -40 55 -40 63 0 21 -376 397 -397 397 -8 0 -37 18 -63
+40 -26 22 -54 40 -61 40 -8 0 -25 9 -39 20 -14 11 -32 20 -40 20 -8 0 -26 9
+-40 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -32 20 -40 20 -8 0 -26
+9 -40 20 -14 11 -41 20 -60 20 -19 0 -46 9 -60 20 -20 15 -41 20 -100 20 -59
+0 -80 5 -100 20 -23 18 -42 20 -260 20 -218 0 -237 -2 -260 -20z m440 -840
+c18 -14 41 -20 80 -20 39 0 62 -6 80 -20 14 -11 31 -20 39 -20 7 0 35 -18 61
+-40 26 -22 55 -40 63 -40 19 0 157 -138 157 -157 0 -8 18 -37 40 -63 22 -26
+40 -54 40 -61 0 -8 9 -25 20 -39 11 -14 20 -32 20 -40 0 -8 9 -26 20 -40 14
+-18 20 -41 20 -80 0 -39 6 -62 20 -80 16 -21 20 -41 20 -120 0 -79 -4 -99 -20
+-120 -14 -18 -20 -41 -20 -80 0 -39 -6 -62 -20 -80 -11 -14 -20 -41 -20 -60 0
+-19 -9 -46 -20 -60 -11 -14 -20 -33 -20 -42 0 -22 -296 -318 -318 -318 -9 0
+-28 -9 -42 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -18 -14 -41 -20
+-80 -20 -39 0 -62 -6 -80 -20 -21 -16 -41 -20 -120 -20 -79 0 -99 4 -120 20
+-18 14 -41 20 -80 20 -39 0 -62 6 -80 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40
+20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -33 20 -42 20 -21 0 -198
+176 -198 197 0 8 -18 37 -40 63 -22 26 -40 54 -40 61 0 8 -9 25 -20 39 -11 14
+-20 41 -20 60 0 19 -9 46 -20 60 -18 23 -20 42 -20 220 0 178 2 197 20 220 11
+14 20 41 20 60 0 19 9 46 20 60 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 33
+20 42 0 22 256 278 278 278 9 0 28 9 42 20 14 11 32 20 40 20 8 0 26 9 40 20
+14 11 41 20 60 20 19 0 46 9 60 20 23 18 42 20 200 20 158 0 177 -2 200 -20z"/>
+<path fill="#960104" d="M9930 3821 c-7 -13 -10 -549 -10 -1661 0 -1112 3 -1648 10 -1661 17
+-30 803 -30 820 0 6 13 10 153 10 388 l0 369 33 32 c31 30 37 32 109 32 l77 0
+421 -420 421 -420 319 0 c381 0 340 -25 340 209 l0 170 -300 301 c-165 166
+-300 306 -300 311 0 22 22 49 40 49 23 0 320 294 320 317 0 8 18 37 40 63 22
+26 40 54 40 61 0 8 9 25 20 39 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 41
+20 60 0 19 9 46 20 60 14 18 20 41 20 80 0 39 6 62 20 80 18 23 20 42 20 220
+0 178 -2 197 -20 220 -14 18 -20 41 -20 80 0 39 -6 62 -20 80 -11 14 -20 32
+-20 40 0 8 -9 26 -20 40 -11 14 -20 40 -20 59 0 24 -11 46 -40 81 -22 26 -40
+53 -40 60 0 7 -18 34 -40 60 -22 26 -40 55 -40 63 0 20 -177 197 -197 197 -8
+0 -37 18 -63 40 -26 22 -53 40 -60 40 -7 0 -34 18 -60 40 -35 29 -57 40 -81
+40 -19 0 -45 9 -59 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -18 14 -41 20
+-80 20 -39 0 -62 6 -80 20 -39 30 -1493 31 -1510 1z m1430 -841 c14 -11 33
+-20 42 -20 21 0 198 -177 198 -198 0 -9 9 -28 20 -42 17 -22 20 -41 20 -140 0
+-99 -3 -118 -20 -140 -11 -14 -20 -31 -20 -39 0 -7 -18 -35 -40 -61 -22 -26
+-40 -54 -40 -62 0 -18 -20 -38 -38 -38 -8 0 -36 -18 -62 -40 -43 -36 -54 -40
+-101 -40 -38 0 -61 -6 -79 -20 -23 -18 -42 -20 -220 -20 l-194 0 -33 32 -33
+32 0 389 c0 248 4 395 10 408 16 30 551 29 590 -1z"/>
+<path fill="#960104" d="M12730 3821 c-6 -13 -10 -157 -10 -401 0 -244 4 -388 10 -401 10 -18
+25 -19 410 -19 385 0 400 -1 410 -19 7 -13 10 -418 10 -1241 0 -823 3 -1228
+10 -1241 17 -30 803 -30 820 0 7 13 10 418 10 1241 0 823 3 1228 10 1241 10
+18 25 19 410 19 385 0 400 1 410 19 6 13 10 157 10 401 0 244 -4 388 -10 401
+-17 30 -2483 30 -2500 0z"/>
+<path fill="#fff" d="M7640 15300 c-14 -11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14 -11
+-33 -20 -42 -20 -22 0 -238 -216 -238 -238 0 -9 -9 -28 -20 -42 -11 -14 -20
+-32 -20 -40 0 -8 -9 -26 -20 -40 -19 -24 -20 -48 -20 -1041 l0 -1017 -71 -71
+-71 -71 -77 0 c-116 0 -141 28 -141 160 0 79 -4 99 -20 120 -14 18 -20 41 -20
+80 0 39 -6 62 -20 80 -11 14 -20 32 -20 40 0 8 -9 26 -20 40 -11 14 -20 32
+-20 40 0 8 -9 26 -20 40 -11 14 -20 32 -20 40 0 8 -9 26 -20 40 -11 14 -20 32
+-20 40 0 9 -36 54 -80 100 -44 46 -80 92 -80 101 0 19 -17 35 -44 40 -10 2
+-23 12 -27 22 -5 9 -13 25 -18 35 -4 9 -17 19 -27 21 -10 2 -40 21 -65 42 -26
+22 -52 39 -59 39 -7 0 -34 18 -60 40 -35 29 -57 40 -81 40 -19 0 -45 9 -59 20
+-14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -20 15 -41 20 -100 20 -59 0 -80 5
+-100 20 -25 19 -52 20 -1520 20 -1468 0 -1495 1 -1520 20 -21 16 -41 20 -120
+20 -79 0 -99 4 -120 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -32 20
+-40 20 -8 0 -26 9 -40 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -31
+20 -39 20 -7 0 -35 18 -61 40 -26 22 -55 40 -63 40 -20 0 -237 217 -237 237 0
+8 -18 37 -40 63 -22 26 -40 54 -40 62 0 22 -47 61 -64 55 -14 -6 -16 -138 -16
+-1278 l0 -1271 40 -48 c22 -26 40 -53 40 -60 0 -7 18 -34 40 -60 22 -26 40
+-55 40 -63 0 -21 256 -277 277 -277 8 0 37 -18 63 -40 26 -22 54 -40 61 -40 8
+0 25 -9 39 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 41 -20 60 -20
+19 0 46 -9 60 -20 14 -11 41 -20 60 -20 19 0 46 -9 60 -20 24 -19 44 -20 500
+-20 456 0 476 -1 500 -20 23 -18 42 -20 240 -20 198 0 217 -2 240 -20 21 -16
+41 -20 120 -20 79 0 99 -4 120 -20 20 -15 41 -20 100 -20 59 0 80 -5 100 -20
+20 -15 41 -20 100 -20 59 0 80 -5 100 -20 18 -14 41 -20 80 -20 39 0 62 -6 80
+-20 18 -14 41 -20 80 -20 39 0 62 -6 80 -20 14 -11 41 -20 60 -20 19 0 46 -9
+60 -20 14 -11 41 -20 60 -20 19 0 46 -9 60 -20 14 -11 41 -20 60 -20 19 0 46
+-9 60 -20 14 -11 41 -20 60 -20 19 0 46 -9 60 -20 14 -11 41 -20 60 -20 19 0
+46 -9 60 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 41 -20 60 -20 19
+0 46 -9 60 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 32 -20 40 -20 8
+0 26 -9 40 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 32 -20 40 -20 8
+0 26 -9 40 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 32 -20 40 -20 8
+0 26 -9 40 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 32 -20 40 -20 8
+0 26 -9 40 -20 14 -11 31 -20 39 -20 7 0 35 -18 61 -40 26 -22 54 -40 61 -40
+8 0 25 -9 39 -20 14 -11 32 -20 40 -20 8 0 44 -27 80 -60 36 -33 71 -60 79
+-60 7 0 35 -18 61 -40 26 -22 53 -40 60 -40 7 0 34 -18 60 -40 26 -22 53 -40
+60 -40 7 0 34 -18 60 -40 26 -22 54 -40 62 -40 8 0 61 -45 118 -100 57 -55
+112 -100 121 -100 10 0 153 -135 319 -300 l301 -300 79 0 78 0 71 71 c39 39
+71 79 71 88 0 22 19 41 41 41 9 0 117 99 239 220 122 121 229 220 239 220 9 0
+55 36 101 80 46 44 91 80 98 80 8 0 36 18 62 40 26 22 54 40 61 40 8 0 43 27
+79 60 36 33 71 60 79 60 7 0 35 18 61 40 26 22 53 40 60 40 7 0 34 18 60 40
+26 22 54 40 61 40 8 0 25 9 39 20 14 11 31 20 39 20 7 0 35 18 61 40 26 22 54
+40 61 40 8 0 25 9 39 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20
+8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9
+40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14
+11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 41 20
+60 20 19 0 46 9 60 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 41 20 60 20 19
+0 46 9 60 20 14 11 41 20 60 20 19 0 46 9 60 20 14 11 32 20 40 20 8 0 26 9
+40 20 18 14 41 20 80 20 39 0 62 6 80 20 14 11 41 20 60 20 19 0 46 9 60 20
+18 14 41 20 80 20 39 0 62 6 80 20 18 14 41 20 80 20 39 0 62 6 80 20 20 15
+41 20 100 20 59 0 80 5 100 20 18 14 41 20 80 20 39 0 62 6 80 20 22 17 42 20
+160 20 118 0 138 3 160 20 23 18 42 20 220 20 178 0 197 2 220 20 24 19 44 20
+500 20 456 0 476 1 500 20 14 11 41 20 60 20 19 0 46 9 60 20 14 11 41 20 60
+20 19 0 46 9 60 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 31 20 39 20 7 0
+35 18 61 40 26 22 55 40 63 40 21 0 277 256 277 277 0 8 18 37 40 63 22 26 40
+54 40 61 0 8 9 25 20 39 11 14 20 32 20 40 0 8 9 26 20 40 21 27 32 2536 11
+2569 -10 15 -31 7 -31 -12 0 -7 -9 -23 -20 -37 -11 -14 -20 -32 -20 -40 0 -8
+-27 -44 -60 -80 -33 -36 -60 -73 -60 -82 0 -21 -176 -198 -197 -198 -8 0 -37
+-18 -63 -40 -26 -22 -53 -40 -60 -40 -7 0 -34 -18 -60 -40 -35 -29 -57 -40
+-81 -40 -19 0 -45 -9 -59 -20 -14 -11 -32 -20 -40 -20 -8 0 -26 -9 -40 -20
+-20 -15 -41 -20 -100 -20 -59 0 -80 -5 -100 -20 -25 -19 -52 -20 -1560 -20
+-1508 0 -1535 -1 -1560 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14
+-11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14 -11 -32 -20 -40 -20 -8 0 -26
+-9 -40 -20 -14 -11 -32 -20 -40 -20 -8 0 -26 -9 -40 -20 -14 -11 -32 -20 -40
+-20 -8 0 -44 -27 -80 -60 -36 -33 -72 -60 -81 -60 -22 0 -159 -137 -159 -159
+0 -9 -27 -45 -60 -81 -33 -36 -60 -72 -60 -80 0 -8 -9 -26 -20 -40 -11 -14
+-20 -32 -20 -40 0 -8 -9 -26 -20 -40 -11 -14 -20 -41 -20 -60 0 -19 -9 -46
+-20 -60 -11 -14 -20 -41 -20 -60 0 -19 -9 -46 -20 -60 -17 -21 -20 -41 -20
+-141 l0 -115 -33 -32 c-71 -69 -286 -33 -287 48 0 8 -9 26 -20 40 -23 29 -32
+1499 -10 1541 10 18 26 19 446 19 l435 0 39 -31 c69 -55 70 -51 70 213 0 216
+-2 235 -20 258 -11 14 -20 41 -20 60 0 19 -9 46 -20 60 -11 14 -20 32 -20 40
+0 8 -9 26 -20 40 -11 14 -20 32 -20 41 0 22 -137 159 -159 159 -9 0 -27 9 -41
+20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -32 20 -40 20 -8 0 -26 9
+-40 20 -24 19 -48 20 -1000 20 -952 0 -976 -1 -1000 -20z"/>
+<path fill="#fff" d="M770 3821 c-14 -27 -14 -3295 0 -3322 10 -18 25 -19 366 -19 312 0
+358 -2 380 -16 24 -16 26 -16 54 11 l30 29 0 376 0 376 33 32 33 32 397 0
+c382 0 397 -1 407 -19 6 -13 10 -157 10 -401 0 -244 4 -388 10 -401 10 -18 24
+-19 288 -19 260 0 279 -2 302 -20 30 -24 49 -25 78 -5 17 12 26 13 42 5 17 -9
+27 -8 45 4 14 9 31 16 39 16 36 0 36 21 36 1680 0 1112 -3 1648 -10 1661 -17
+30 -803 30 -820 0 -7 -13 -10 -290 -10 -828 l0 -809 -33 -32 -33 -32 -295 0
+c-249 0 -298 2 -317 15 -17 12 -26 13 -42 5 -16 -8 -25 -7 -42 5 -13 8 -39 15
+-60 15 -60 0 -58 -32 -58 840 0 533 -3 808 -10 821 -10 18 -25 19 -410 19
+-385 0 -400 -1 -410 -19z"/>
+<path fill="#fff" d="M3770 3821 c-14 -27 -14 -3295 0 -3322 6 -10 17 -19 26 -19 8 0 26
+-7 39 -16 23 -15 27 -15 50 0 40 26 440 23 475 -4 18 -14 41 -20 80 -20 39 0
+62 6 80 20 14 11 33 20 42 20 35 0 38 32 38 420 0 244 4 388 10 401 10 18 26
+19 428 19 431 0 442 1 442 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20
+40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14
+20 32 20 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 32 20
+40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 31 20 38 0 8 10
+27 21 44 31 43 14 78 -38 78 -22 0 -48 9 -63 20 -18 14 -41 20 -80 20 -39 0
+-62 -6 -80 -20 -23 -18 -42 -20 -240 -20 -198 0 -217 2 -240 20 -35 27 -125
+27 -160 0 -18 -14 -41 -20 -80 -20 -39 0 -62 6 -80 20 -31 24 -49 25 -79 4
+-21 -15 -24 -15 -52 12 l-29 28 0 389 c0 248 4 395 10 408 10 19 29 19 730 19
+701 0 720 0 730 19 6 13 10 157 10 401 0 244 -4 388 -10 401 -17 30 -2283 30
+-2300 0z"/>
+<path fill="#fff" d="M7760 3820 c-20 -15 -41 -20 -100 -20 -59 0 -80 -5 -100 -20 -14 -11
+-41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9
+-60 -20 -14 -11 -32 -20 -40 -20 -8 0 -26 -9 -40 -20 -14 -11 -31 -20 -39 -20
+-7 0 -35 -18 -61 -40 -26 -22 -54 -40 -61 -40 -8 0 -43 -27 -79 -60 -36 -33
+-73 -60 -82 -60 -21 0 -198 -177 -198 -198 0 -9 -27 -46 -60 -82 -33 -36 -60
+-71 -60 -79 0 -7 -18 -35 -40 -61 -22 -26 -40 -54 -40 -61 0 -8 -9 -25 -20
+-39 -11 -14 -20 -32 -20 -40 0 -8 -9 -26 -20 -40 -11 -14 -20 -41 -20 -60 0
+-19 -9 -46 -20 -60 -11 -14 -20 -32 -20 -40 0 -8 -9 -26 -20 -40 -15 -20 -20
+-41 -20 -100 0 -59 -5 -80 -20 -100 -18 -23 -20 -42 -20 -280 0 -238 2 -257
+20 -280 15 -20 20 -41 20 -100 0 -59 5 -80 20 -100 11 -14 20 -41 20 -60 0
+-19 9 -46 20 -60 11 -14 20 -32 20 -40 0 -8 9 -26 20 -40 11 -14 20 -40 20
+-59 0 -24 11 -46 40 -81 22 -26 40 -53 40 -60 0 -7 18 -34 40 -60 22 -26 40
+-55 40 -63 0 -22 376 -397 398 -397 9 0 28 -9 42 -20 14 -11 31 -20 39 -20 7
+0 35 -18 61 -40 26 -22 54 -40 61 -40 8 0 25 -9 39 -20 14 -11 41 -20 60 -20
+19 0 46 -9 60 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 18 -14 41 -20 80
+-20 39 0 62 -6 80 -20 24 -19 43 -20 380 -20 337 0 356 1 380 20 18 14 41 20
+80 20 39 0 62 6 80 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8
+0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40 26 22 53 40 60 40 7 0 34 18
+60 40 26 22 55 40 63 40 21 0 317 296 317 317 0 8 18 37 40 63 22 26 40 53 40
+60 0 7 18 34 40 60 29 35 40 57 40 81 0 19 9 45 20 59 11 14 20 32 20 40 0 8
+9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 14 18 20 41 20 80 0 39 6 62 20
+80 17 21 20 41 20 140 0 99 3 119 20 140 16 21 20 41 20 120 0 79 -4 99 -20
+120 -16 21 -20 41 -20 120 0 79 -4 99 -20 120 -14 18 -20 41 -20 80 0 39 -6
+62 -20 80 -11 14 -20 41 -20 60 0 19 -9 46 -20 60 -11 14 -20 32 -20 40 0 8
+-9 26 -20 40 -11 14 -20 32 -20 40 0 8 -9 26 -20 40 -11 14 -20 31 -20 39 0 7
+-18 35 -40 61 -22 26 -40 55 -40 63 0 21 -376 397 -397 397 -8 0 -37 18 -63
+40 -26 22 -54 40 -61 40 -8 0 -25 9 -39 20 -14 11 -32 20 -40 20 -8 0 -26 9
+-40 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -32 20 -40 20 -8 0 -26
+9 -40 20 -14 11 -41 20 -60 20 -19 0 -46 9 -60 20 -20 15 -41 20 -100 20 -59
+0 -80 5 -100 20 -23 18 -42 20 -260 20 -218 0 -237 -2 -260 -20z m440 -840
+c18 -14 41 -20 80 -20 39 0 62 -6 80 -20 14 -11 31 -20 39 -20 7 0 35 -18 61
+-40 26 -22 55 -40 63 -40 19 0 157 -138 157 -157 0 -8 18 -37 40 -63 22 -26
+40 -54 40 -61 0 -8 9 -25 20 -39 11 -14 20 -32 20 -40 0 -8 9 -26 20 -40 14
+-18 20 -41 20 -80 0 -39 6 -62 20 -80 16 -21 20 -41 20 -120 0 -79 -4 -99 -20
+-120 -14 -18 -20 -41 -20 -80 0 -39 -6 -62 -20 -80 -11 -14 -20 -41 -20 -60 0
+-19 -9 -46 -20 -60 -11 -14 -20 -33 -20 -42 0 -22 -296 -318 -318 -318 -9 0
+-28 -9 -42 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -18 -14 -41 -20
+-80 -20 -39 0 -62 -6 -80 -20 -21 -16 -41 -20 -120 -20 -79 0 -99 4 -120 20
+-18 14 -41 20 -80 20 -39 0 -62 6 -80 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40
+20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -33 20 -42 20 -21 0 -198
+176 -198 197 0 8 -18 37 -40 63 -22 26 -40 54 -40 61 0 8 -9 25 -20 39 -11 14
+-20 41 -20 60 0 19 -9 46 -20 60 -18 23 -20 42 -20 220 0 178 2 197 20 220 11
+14 20 41 20 60 0 19 9 46 20 60 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 33
+20 42 0 22 256 278 278 278 9 0 28 9 42 20 14 11 32 20 40 20 8 0 26 9 40 20
+14 11 41 20 60 20 19 0 46 9 60 20 23 18 42 20 200 20 158 0 177 -2 200 -20z"/>
+<path fill="#fff" d="M9930 3821 c-7 -13 -10 -549 -10 -1661 0 -1112 3 -1648 10 -1661 17
+-30 803 -30 820 0 6 13 10 153 10 388 l0 369 33 32 c31 30 37 32 109 32 l77 0
+421 -420 421 -420 319 0 c381 0 340 -25 340 209 l0 170 -300 301 c-165 166
+-300 306 -300 311 0 22 22 49 40 49 23 0 320 294 320 317 0 8 18 37 40 63 22
+26 40 54 40 61 0 8 9 25 20 39 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 41
+20 60 0 19 9 46 20 60 14 18 20 41 20 80 0 39 6 62 20 80 18 23 20 42 20 220
+0 178 -2 197 -20 220 -14 18 -20 41 -20 80 0 39 -6 62 -20 80 -11 14 -20 32
+-20 40 0 8 -9 26 -20 40 -11 14 -20 40 -20 59 0 24 -11 46 -40 81 -22 26 -40
+53 -40 60 0 7 -18 34 -40 60 -22 26 -40 55 -40 63 0 20 -177 197 -197 197 -8
+0 -37 18 -63 40 -26 22 -53 40 -60 40 -7 0 -34 18 -60 40 -35 29 -57 40 -81
+40 -19 0 -45 9 -59 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -18 14 -41 20
+-80 20 -39 0 -62 6 -80 20 -39 30 -1493 31 -1510 1z m1430 -841 c14 -11 33
+-20 42 -20 21 0 198 -177 198 -198 0 -9 9 -28 20 -42 17 -22 20 -41 20 -140 0
+-99 -3 -118 -20 -140 -11 -14 -20 -31 -20 -39 0 -7 -18 -35 -40 -61 -22 -26
+-40 -54 -40 -62 0 -18 -20 -38 -38 -38 -8 0 -36 -18 -62 -40 -43 -36 -54 -40
+-101 -40 -38 0 -61 -6 -79 -20 -23 -18 -42 -20 -220 -20 l-194 0 -33 32 -33
+32 0 389 c0 248 4 395 10 408 16 30 551 29 590 -1z"/>
+<path fill="#fff" d="M12730 3821 c-6 -13 -10 -157 -10 -401 0 -244 4 -388 10 -401 10 -18
+25 -19 410 -19 385 0 400 -1 410 -19 7 -13 10 -418 10 -1241 0 -823 3 -1228
+10 -1241 17 -30 803 -30 820 0 7 13 10 418 10 1241 0 823 3 1228 10 1241 10
+18 25 19 410 19 385 0 400 1 410 19 6 13 10 157 10 401 0 244 -4 388 -10 401
+-17 30 -2483 30 -2500 0z"/>
+</g>
+<g fill="none" stroke="#fff" stroke-width="6"><circle cx="1493" cy="1585" r="29"/></g>
+<text x="1493" y="1585" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="38" text-anchor="middle" dominant-baseline="central">R</text>
+</svg>
+  <svg id="pg" viewBox="0 0 100 86"></svg>
+  <div id="pv">-- bar</div>
+  <div class="il" id="tv">-- °C</div>
+  <div class="il" id="hv">-- h</div>
+  <div class="il" id="huv">-- h</div>
+</div>
+<div id="acoes">
+  <button id="conf">CONFERIR HORIZONTAL</button>
+  <button id="ens" class="seg"><span class="segb"></span><span class="segl">ENSINAR LIMITE (segure 3 s)</span></button>
+  <button id="ensg" class="seg"><span class="segb"></span><span class="segl">LIMITES DE GIRO (segure 3 s)</span></button>
+  <button id="cfg" class="seg"><span class="segb"></span><span class="segl">&#9881; CONFIGURAR (segure 3 s)</span></button>
+</div>
+<div id="pe">—</div>
+<script>
+/* DASH WEB (gerado por hfort40/tools/gera-dash-web.py a partir de firmware/shared/web/op.html — NAO edite aqui). Em vez de um gateway por HTTP,
+   a /op fala com o SIMULADOR por BroadcastChannel: ele publica o estado no formato do /all a 10 Hz e atende /setgeo. */
+(function(){
+  var ch=new BroadcastChannel('hfort-sim'),ult=null,pend={},seq=0;
+  var nome=null;
+  ch.onmessage=function(e){var m=e.data||{};
+    if(m.t==='estado'){ult=m;
+      if(m.geo&&m.geo.nome!==nome){nome=m.geo.nome;if(window.carregaGeo)window.carregaGeo();}}   // outro modelo = outra geometria
+    else if(m.t==='resp'&&pend[m.id]){pend[m.id](m);delete pend[m.id];}};
+  function ok(corpo,json){return Promise.resolve({ok:true,status:200,json:function(){return Promise.resolve(corpo);},text:function(){return Promise.resolve(JSON.stringify(corpo));}});}
+  window.fetch=function(u){
+    var rota=String(u).split('?')[0];
+    if(rota==='/all'||rota==='/geo'){
+      var vivo=function(){return ult&&Date.now()-ult.ts<1500;};
+      if(vivo())return ok(rota==='/all'?ult.all:ult.geo);
+      ch.postMessage({t:'oi'});
+      if(rota==='/all')return Promise.reject(new Error('sem simulador'));
+      return new Promise(function(res,rej){           // /geo pedido no carregamento: espera o primeiro estado (ate 3 s)
+        var n=0,iv=setInterval(function(){
+          if(vivo()){clearInterval(iv);res(ok(ult.geo));}
+          else if(++n>30){clearInterval(iv);rej(new Error('sem simulador'));}
+        },100);
+      }).then(function(r){return r;});
+    }
+    return new Promise(function(res,rej){
+      var id=++seq,t=setTimeout(function(){delete pend[id];rej(new Error('sem resposta'));},2000);
+      pend[id]=function(m){clearTimeout(t);res({ok:m.st>=200&&m.st<300,status:m.st,
+        json:function(){return Promise.resolve(JSON.parse(m.corpo));},text:function(){return Promise.resolve(m.corpo);}});};
+      ch.postMessage({t:'cmd',id:id,u:String(u)});
+    });
+  };
+  ch.postMessage({t:'oi'});
+})();
+</script>
+<style>#cfg{display:none!important}</style>
+<script>
+var SV=document.getElementById('sv');
+var GEO=null;
+function carregaGeo(){fetch('/geo').then(function(r){return r.json();}).then(function(g){GEO=g;}).catch(function(){});}
+carregaGeo();
+
+// Pose vista de lado: coluna, braco, lanca. Angulos em GRAUS, ja descontados
+// os zeros pelo gateway — e por isso que o desenho denuncia calibracao errada.
+function desenhar(t1,t2,lim,alarme,pav){ desenharEm(SV,t1,t2,lim,alarme,false,pav); }
+function desenharEm(alvo,t1,t2,lim,alarme,guia,pav){
+  if(!GEO){alvo.innerHTML='';return;}
+  var l0=GEO.l0,l1=GEO.l1,l2=GEO.l2;
+  var alc=l0+l1+l2;
+  // A proporcao acompanha a area do desenho: fixa em 200x120 (larga), numa
+  // area alta e estreita (retrato) a grua ficava limitada pela largura.
+  var W=200,H=120,mx=14,my=10,cx0=alvo.getBoundingClientRect();
+  if(cx0.width>0&&cx0.height>0) H=Math.max(90,Math.min(320,W*cx0.height/cx0.width));
+  alvo.setAttribute('viewBox','0 0 '+W+' '+H.toFixed(0));
+  var r1=t1*Math.PI/180, r2=(t1-t2)*Math.PI/180;
+  // ESCALA PELO LIMITE, nao pelo alcance: cobrir os 8,5 m que a maquina
+  // alcanca deixava a grua pequena quando o limite esta em 5 m (pedido do
+  // Mario, 2026-09-25). A escala so muda quando o LIMITE muda — nao a cada
+  // movimento, para o olho poder comparar poses —, exceto se a pose passar do
+  // limite: ai ela entra na escala, porque a ponta sumindo da tela esconderia
+  // justamente o perigo. Sem limite (calibracao), vale o alcance.
+  var topo=alc;
+  if(lim>0){
+    var hPose=Math.max(l0+l1*Math.sin(r1), l0+l1*Math.sin(r1)+l2*Math.sin(r2));
+    topo=Math.max(lim+0.6, l0+2, hPose+0.3);
+  }
+  var esc=Math.min((W-2*mx)/(l1+l2), (H-2*my)/topo);
+  // Coluna a DIREITA e braco para a esquerda — a mesma orientacao do painel
+  // do tecnico (antes as duas telas desenhavam a grua espelhadas).
+  var bx=W-mx-6, by=H-my;                       // base da coluna
+  var cx=bx, cy=by-l0*esc;                      // topo da coluna (cotovelo)
+  var ex=cx-l1*Math.cos(r1)*esc, ey=cy-l1*Math.sin(r1)*esc;   // fim do braco
+  var px=ex-l2*Math.cos(r2)*esc, py=ey-l2*Math.sin(r2)*esc;   // ponta da lanca
+  var cor=alarme?'#ff3b47':'#eaf5ee';
+  var g='';
+  g+='<line x1="0" y1="'+by+'" x2="'+W+'" y2="'+by+'" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>';
+  // Limite (trava) e pre-aviso, com o nome — as mesmas linhas do painel.
+  if(lim>0){
+    var yLim=by-lim*esc;
+    g+='<line x1="0" y1="'+yLim+'" x2="'+W+'" y2="'+yLim+'" stroke="#ff3b47" stroke-width="1.5"/>';
+    g+='<text x="3" y="'+(yLim-2.5)+'" font-size="7" fill="#ff6b6b">limite</text>';
+    if(pav>0&&pav<lim-0.01){
+      var yPav=by-pav*esc;
+      g+='<line x1="0" y1="'+yPav+'" x2="'+W+'" y2="'+yPav+'" stroke="#ffb020" stroke-width="1.2" stroke-dasharray="5 4"/>';
+      g+='<text x="3" y="'+(yPav+8)+'" font-size="7" fill="#ffb020">pré-aviso</text>';
+    }
+  }
+  // Guia da conferencia: a horizontal no topo da coluna. Braco e lanca tem de
+  // cair EM CIMA dela — o olho compara com uma reta, nao com a propria memoria.
+  if(guia) g+='<line x1="0" y1="'+cy+'" x2="'+W+'" y2="'+cy+
+              '" stroke="#25c26a" stroke-width="1" stroke-dasharray="3 3"/>';
+  g+='<line x1="'+bx+'" y1="'+by+'" x2="'+cx+'" y2="'+cy+'" stroke="#8aa" stroke-width="5" stroke-linecap="round"/>';
+  g+='<line x1="'+cx+'" y1="'+cy+'" x2="'+ex+'" y2="'+ey+'" stroke="'+cor+'" stroke-width="5" stroke-linecap="round"/>';
+  g+='<line x1="'+ex+'" y1="'+ey+'" x2="'+px+'" y2="'+py+'" stroke="'+cor+'" stroke-width="4" stroke-linecap="round"/>';
+  g+='<circle cx="'+cx+'" cy="'+cy+'" r="3" fill="#8aa"/>';
+  g+='<circle cx="'+px+'" cy="'+py+'" r="3.5" fill="'+cor+'"/>';
+  // A ALTURA da ponta, como numero ao lado dela (a barra de altura que havia na coluna da esquerda foi trocada por este numero e pela carga).
+  if(lim>0&&!guia){
+    var hT=l0+l1*Math.sin(r1)+l2*Math.sin(r2), fim=(px>W*0.62);
+    g+='<text x="'+(px+(fim?-6:6))+'" y="'+(py-6)+'" text-anchor="'+(fim?'end':'start')+'" font-size="9.5" font-weight="800" fill="'+cor+'" '+
+       'font-family="sans-serif" stroke="#0d1a12" stroke-width="2.4" paint-order="stroke">'+hT.toFixed(2).replace('.',',')+' m</text>';
+  }
+  alvo.innerHTML=g;
+}
+
+var C=document.getElementById('cal'),CB=document.getElementById('cb'),CL=document.getElementById('cl');
+function zerar(qual,nome,pos){
+  if(!confirm('ZERAR '+nome+'\n\nA '+nome.toLowerCase()+' está NA HORIZONTAL agora?\n\n'+
+              'A leitura atual será gravada como o zero. Se a posição estiver errada, '+
+              'a altura calculada fica errada e o sistema deixa de proteger.'))return;
+  fetch('/setgeo?'+qual+'=1').then(function(r){
+    if(!r.ok){alert('Sensor sem sinal — nada foi gravado.\n\nO sensor da '+
+                    nome.toLowerCase()+' está ligado?');return;}
+    ciclo();
+  }).catch(function(){alert('não consegui falar com o gateway.');});
+}
+CB.onclick=function(){zerar('zerabraco','BRAÇO');};
+CL.onclick=function(){zerar('zeralanca','LANÇA');};
+
+// ——— Conferencia da horizontal ———
+// O sistema NAO precisa acreditar na palavra de ninguem: com braco e lanca na
+// horizontal, a altura tem de dar l0 — a altura da coluna, que e fixa e conhecida
+// pelo modelo. Se der outra coisa, o zero esta errado. Isso torna a conferencia
+// uma MEDIDA, nao um lembrete: o operador ve o desenho deitado E o numero
+// batendo, e nenhum dos dois sozinho seria prova.
+//
+// Vale como rotina de inicio de turno porque o zero se perde por motivos
+// invisiveis: sensor que girou no suporte, placa trocada, calibracao feita em
+// bancada e nunca refeita na maquina. Nada disso muda a aparencia do sistema —
+// a tela continua verde, mostrando altura errada.
+var OV=document.getElementById('ov'),SV2=document.getElementById('sv2'),
+    VER=document.getElementById('ver'),VTX=document.getElementById('vertxt');
+var confAberta=false;
+document.getElementById('conf').onclick=function(){confAberta=true;OV.className='on';};
+document.getElementById('ovf').onclick=function(){confAberta=false;OV.className='';};
+// Zera OS DOIS numa chamada e deixa a conferencia ABERTA: o resultado aparece
+// na hora, no desenho e nos angulos. Antes zerava so o braco e fechava a tela —
+// a lanca continuava torta e ninguem via.
+document.getElementById('ovr').onclick=function(){
+  if(!confirm('ZERAR BRAÇO E LANÇA\n\nOs DOIS estão NA HORIZONTAL agora?\n\n'+
+              'As leituras atuais viram o zero. O limite ensinado continua sendo a mesma pose '+
+              '(a altura dele é recalculada).'))return;
+  fetch('/setgeo?zerabraco=1&zeralanca=1').then(function(r){
+    if(!r.ok) return r.text().then(function(t){alert('Nada foi gravado:\n\n'+t);});
+    carregaGeo(); ciclo();
+  }).catch(function(){alert('não consegui falar com o gateway.');});
+};
+
+function conferir(d){
+  if(!GEO)return;
+  desenharEm(SV2,d.t1,d.t2,0,false,true);
+  // ANGULO DE CADA PARTE, nao a altura maxima. Comparar a altura do ponto mais
+  // alto com l0 deixava passar a lanca CAIDA: com ela apontando pra baixo o
+  // ponto mais alto vira o cotovelo, que esta certo, e a conferencia dizia
+  // CONFERE com a lanca 13 graus torta (visto na bancada 2026-09-25).
+  // 1,5 grau: ~10 cm no fim do braco desta grua — folga de montagem e ruido,
+  // sem deixar passar erro que importe.
+  var TOL=1.5, ab=d.t1, al=d.t1-d.t2;
+  var okB=Math.abs(ab)<=TOL, okL=Math.abs(al)<=TOL, ok=okB&&okL;
+  function grau(v){return (v>=0?'+':'')+v.toFixed(1).replace('.',',')+'°';}
+  VER.className=ok?'ok':'no';
+  VER.textContent=(ok?'CONFERE':'NÃO CONFERE')+'  ·  braço '+grau(ab)+(okB?' ✓':' ✗')+
+                  '  ·  lança '+grau(al)+(okL?' ✓':' ✗');
+  var tortos=[];
+  if(!okB)tortos.push(tortos.length?'o BRAÇO':'O BRAÇO');
+  if(!okL)tortos.push(tortos.length?'a LANÇA':'A LANÇA');
+  VTX.textContent=ok
+    ? ('Os dois a menos de '+TOL.toString().replace('.',',')+'° da horizontal. Pode operar.')
+    : ('Com braço e lança deitados, os dois deveriam ler 0°. '+tortos.join(' e ')+
+       (tortos.length>1?' estão fora':' está fora')+'. Se estão MESMO na horizontal, '+
+       'o zero está errado — toque em ZERAR BRAÇO E LANÇA.');
+}
+// ——— Instrumentos ———
+function pt(cx,cy,r,a){var t=a*Math.PI/180;return [cx+r*Math.cos(t),cy+r*Math.sin(t)];}
+function arco(cx,cy,r,a0,a1){
+  var p0=pt(cx,cy,r,a0),p1=pt(cx,cy,r,a1);
+  return 'M'+p0[0].toFixed(2)+' '+p0[1].toFixed(2)+' A'+r+' '+r+' 0 '+((a1-a0)>180?1:0)+' 1 '+
+         p1[0].toFixed(2)+' '+p1[1].toFixed(2);
+}
+// Arco de 270 graus, de baixo-esquerda (135) a baixo-direita (405), pelo alto.
+function manometro(p){
+  var PM=(GEO&&GEO.pmax)||600, cx=50,cy=50,r=40,g='';
+  g+='<path d="'+arco(cx,cy,r,135,405)+'" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="8"/>';
+  for(var k=0;k<=6;k++){
+    var a=135+270*k/6, q0=pt(cx,cy,r-7,a), q1=pt(cx,cy,r+4,a);
+    g+='<line x1="'+q0[0]+'" y1="'+q0[1]+'" x2="'+q1[0]+'" y2="'+q1[1]+'" stroke="rgba(255,255,255,0.45)" stroke-width="1.2"/>';
+  }
+  if(p!==null&&p!==undefined){
+    var f=Math.max(0,Math.min(1,p/PM)), av=135+270*f;
+    if(f>0.004) g+='<path d="'+arco(cx,cy,r,135,av)+'" fill="none" stroke="#25c26a" stroke-width="8"/>';
+    var n=pt(cx,cy,r-4,av);
+    g+='<line x1="'+cx+'" y1="'+cy+'" x2="'+n[0]+'" y2="'+n[1]+'" stroke="#fff" stroke-width="3" stroke-linecap="round"/>';
+  }
+  g+='<circle cx="'+cx+'" cy="'+cy+'" r="4" fill="#8aa"/>';
+  g+='<text x="16" y="84" font-size="8" fill="rgba(255,255,255,0.55)">0</text>';
+  g+='<text x="84" y="84" font-size="8" fill="rgba(255,255,255,0.55)" text-anchor="end">'+PM+'</text>';
+  document.getElementById('pg').innerHTML=g;
+}
+var glDes=0,gAnt=null,gU=0,guAtual=null,GIROD=null;
+// ——— DIAL DO GIRO ———
+// O curso inteiro do modelo (de -gl a +gl) ocupa 300 graus de mostrador, com o zero no alto e o positivo para a direita; o fundo aberto fica embaixo,
+// onde mora o numero. Zonas: alem de cada limite programado (vermelho, onde o giro TRAVA) e a faixa de aviso antes dele (ambar).
+function dialGiro(d,gl,gu){
+  var cx=50,cy=52,r=38,K=150/gl;
+  function al(a){return a*K;}                                   // graus reais -> graus do mostrador (0 no alto, horario positivo)
+  function P(a,rr){var t=al(a)*Math.PI/180;return [cx+rr*Math.sin(t),cy-rr*Math.cos(t)];}
+  function arc(a0,a1,rr){var p0=P(a0,rr),p1=P(a1,rr),g=Math.abs(al(a1)-al(a0))>180?1:0;
+    return 'M'+p0[0].toFixed(2)+' '+p0[1].toFixed(2)+' A'+rr+' '+rr+' 0 '+g+' 1 '+p1[0].toFixed(2)+' '+p1[1].toFixed(2);}
+  var gn=d.gn,gp=d.gp,gq=(d.gq>0)?d.gq:0,h='',a,p,q;
+  function num(v){return typeof v==='number';}
+  var ge=(gu===null)?0:(d.ge||0);
+  h+='<path d="'+arc(-gl,gl,r)+'" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="8"/>';
+  if(num(gn)){h+='<path d="'+arc(-gl,gn,r)+'" fill="none" stroke="#ff3b47" stroke-opacity=".55" stroke-width="8"/>';
+    if(gq>0)h+='<path d="'+arc(gn,Math.min(gn+gq,gl),r)+'" fill="none" stroke="#ffb020" stroke-opacity=".6" stroke-width="8"/>';}
+  if(num(gp)){h+='<path d="'+arc(gp,gl,r)+'" fill="none" stroke="#ff3b47" stroke-opacity=".55" stroke-width="8"/>';
+    if(gq>0)h+='<path d="'+arc(Math.max(gp-gq,-gl),gp,r)+'" fill="none" stroke="#ffb020" stroke-opacity=".6" stroke-width="8"/>';}
+  // marcas a cada 30 graus reais; numero no zero, nos multiplos de 90 e nas pontas
+  for(a=-Math.floor(gl/30)*30;a<=gl;a+=30){p=P(a,r+5);q=P(a,r-(a%90===0?10:7));
+    h+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+q[0].toFixed(1)+'" y2="'+q[1].toFixed(1)+'" stroke="rgba(255,255,255,0.55)" stroke-width="'+(a%90===0?1.4:0.9)+'"/>';}
+  var rot=[0,-gl,gl];for(a=90;a<=gl-45;a+=90)rot.push(a,-a);
+  for(var i=0;i<rot.length;i++){q=P(rot[i],r-14);
+    h+='<text x="'+q[0].toFixed(1)+'" y="'+(q[1]+2.4).toFixed(1)+'" text-anchor="middle" font-size="7" fill="rgba(255,255,255,0.62)" font-family="sans-serif">'+rot[i]+'</text>';}
+  // traco do limite, mais forte que a marca
+  [gn,gp].forEach(function(v){if(!num(v))return;p=P(v,r+6);q=P(v,r-6);
+    h+='<line x1="'+p[0].toFixed(1)+'" y1="'+p[1].toFixed(1)+'" x2="'+q[0].toFixed(1)+'" y2="'+q[1].toFixed(1)+'" stroke="#ff3b47" stroke-width="2.6" stroke-linecap="round"/>';});
+  // ponteiro
+  if(gu!==null){var n=P(gu,r-3),cor=ge===2?'#ff3b47':(ge===1?'#ffb020':'#fff');
+    h+='<line x1="'+cx+'" y1="'+cy+'" x2="'+n[0].toFixed(1)+'" y2="'+n[1].toFixed(1)+'" stroke="'+cor+'" stroke-width="3" stroke-linecap="round"/>';}
+  h+='<circle cx="'+cx+'" cy="'+cy+'" r="4.5" fill="#8aa"/>';
+  var val=(gu===null)?'--':((gu<0?'\u2212':(gu>0?'+':''))+Math.abs(Math.round(gu))+'\u00b0');
+  h+='<text x="50" y="91" text-anchor="middle" font-size="16" font-weight="800" fill="#fff" font-family="sans-serif">'+val+'</text>';
+  h+='<text x="50" y="101" text-anchor="middle" font-size="7.5" font-weight="700" letter-spacing=".6" fill="rgba(255,255,255,0.7)" font-family="sans-serif">GIRO</text>';
+  document.getElementById('gsv').innerHTML=h;
+  document.getElementById('gg').className=(gu===null)?'nd':'';
+  GIROD=d;
+  atualizaOvg();
+}
+function milhar(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+// CARGA: a coluna da esquerda. A tabela do fabricante vale SEM garra e SEM rotator (d.tr = o peso deles), entao a carga LIQUIDA (leitura menos a
+// tara) e a que se compara com o MAXIMO publicado, e e ela que decide a cor. A barra empilha a tara (cinza) e a liquida (colorida); a marca vermelha
+// fica em tara + maximo, e a ambar em tara + 85% do maximo. Sem peso e sem tabela (outros modelos) a coluna fica apagada, dizendo que nao ha tabela.
+function carga(d){
+  var el=document.getElementById('pw'),$=function(i){return document.getElementById(i);};
+  var temPeso=(typeof d.w==='number'),temMax=(typeof d.cm==='number'&&d.cm>0);
+  var tr=(typeof d.tr==='number'&&d.tr>0)?d.tr:0, liq=temPeso?Math.max(0,d.w-tr):null;
+  el.className=(temPeso||temMax)?'':'nd';
+  $('pwr').textContent=(typeof d.ra==='number'&&temMax)?('raio '+d.ra.toFixed(1).replace('.',',')+' m'):'';
+  $('pwl').innerHTML=(liq===null?'--':milhar(liq)+'<span style="font-size:.5em"> kg</span>')+'<small>carga líquida</small>';
+  $('pwa').textContent=temPeso?milhar(d.w)+' kg':'--';
+  $('pwm').textContent=temMax?milhar(d.cm)+' kg':(temPeso?'sem tabela':'--');
+  $('pwtr').textContent=tr>0?milhar(tr)+' kg':'--';
+  var esc=temMax?(tr+d.cm)*1.2:(temPeso?Math.max(d.w*1.3,1):0);
+  function pc(v){return Math.max(0,Math.min(100,esc>0?v/esc*100:0));}
+  $('pwtara').style.height=temPeso?pc(Math.min(d.w,tr))+'%':'0';
+  var f=$('pwliq'); f.style.bottom=temPeso?pc(Math.min(d.w,tr))+'%':'0';
+  f.style.height=temPeso?pc(d.w)-pc(Math.min(d.w,tr))+'%':'0';
+  var r=(temPeso&&temMax)?liq/d.cm:0;
+  f.style.background=(temPeso&&temMax)?(r>1?'#ff3b47':(r>=0.85?'#ffb020':'#25c26a')):'#6c8aa6';
+  var mx=$('pwmx'),av=$('pwav');
+  mx.style.display=temMax?'block':'none'; av.style.display=temMax?'block':'none';
+  if(temMax){mx.style.bottom=pc(tr+d.cm)+'%';av.style.bottom=pc(tr+d.cm*0.85)+'%';}
+}
+function desenrola(g,gl){
+  if(gAnt===null)gU=g;
+  else{var dl=g-gAnt;if(dl>180)dl-=360;if(dl<-180)dl+=360;gU+=dl;}
+  gAnt=g;
+  if(gU>gl)gU-=360;if(gU<-gl)gU+=360;
+  return Math.max(-gl,Math.min(gl,gU));
+}
+function instrumentos(d){
+  manometro(d.p);
+  // Giro: sem sinal recente (bit 0 de "stale") a regua apaga em vez de fingir uma posicao. A faixa vem do modelo (d.gl =
+  // curso de cada lado do zero). O sensor entrega 0..360 (o gateway, -180..+180): num curso maior que 180 o mesmo angulo
+  // vale para dois lados, entao a posicao e "desenrolada" seguindo a continuidade do movimento.
+  var gOk=typeof d.g==='number'&&!(d.stale&1);
+  var gl=(typeof d.gl==='number'&&d.gl>0)?d.gl:180;
+  if(gl!==glDes){glDes=gl;gAnt=null;}            // outro modelo = outro curso: recomeca o "desenrolar"
+  var gu=null;
+  if(gOk)gu=desenrola(d.g,gl);
+  guAtual=gu;
+  dialGiro(d,gl,gu);
+  carga(d);
+  document.getElementById('pv').textContent=(d.p===null||d.p===undefined)?'-- bar':(d.p.toFixed(0)+' bar');
+  document.getElementById('tv').textContent=(d.t===null||d.t===undefined)?'-- °C':(d.t.toFixed(1)+' °C');
+  // Horas e minutos: com 1 casa decimal (6 min) o horimetro parecia parado.
+  // Dois horimetros: OPERANDO (pressao em carga ou braco/lanca se movendo) e
+  // LIGADO (gateway energizado — acompanha a chave da maquina).
+  function hmin(h){if(h===undefined)return '--';var m=Math.round(h*60);return Math.floor(m/60)+' h '+('0'+(m%60)).slice(-2)+' min';}
+  document.getElementById('hv').textContent=hmin(d.hop)+' operação';
+  document.getElementById('huv').textContent=hmin(d.hup)+' ligado';
+}
+
+// ——— Ensinar o limite ———
+// Mesmo gesto do painel do tecnico: o gateway mede a pose PARADA e grava a
+// altura dela; esta tela so pede. Em seguida, o pre-aviso so vale CONFIRMADO.
+var OVE=document.getElementById('ove'),PAVV=document.getElementById('pavv'),PAVT=document.getElementById('pavtxt');
+var pav=0,limNovo=0;
+// "Segure 3 s": o gesto dos botoes que mudam configuracao nesta tela. A barra
+// enche enquanto segura; soltou antes, nada acontece.
+function segurar(botao,acao){
+  var barra=botao.querySelector('.segb'),t=null,i=null,ini=0;
+  function solta(){if(t){clearTimeout(t);t=null;}if(i){clearInterval(i);i=null;}barra.style.width='0';}
+  function segura(e){
+    if(e&&e.preventDefault)e.preventDefault();
+    solta(); ini=Date.now();
+    i=setInterval(function(){barra.style.width=Math.min(100,(Date.now()-ini)/30)+'%';},50);
+    t=setTimeout(function(){solta();acao();},3000);
+  }
+  botao.addEventListener('touchstart',segura,{passive:false});
+  botao.addEventListener('mousedown',segura);
+  ['touchend','touchcancel','mouseup','mouseleave'].forEach(function(ev){botao.addEventListener(ev,solta);});
+}
+segurar(document.getElementById('ens'),function(){ensinar();});
+segurar(document.getElementById('cfg'),function(){location.href='/';});
+// ——— Limites de giro ———
+var OVG=document.getElementById('ovg');
+function graus(v){return (typeof v==='number')?((v<0?'\u2212':(v>0?'+':''))+Math.abs(v).toFixed(1).replace('.',',')+'\u00b0'):'--';}
+function atualizaOvg(){
+  if(!GIROD||OVG.className!=='on')return;
+  document.getElementById('ovga').textContent=(guAtual===null)?'--':graus(Math.round(guAtual*10)/10);
+  document.getElementById('ovgvn').textContent=graus(GIROD.gn);
+  document.getElementById('ovgvp').textContent=graus(GIROD.gp);
+  document.getElementById('ovgpv').textContent=(GIROD.gq>0)?(GIROD.gq.toFixed(0)+'\u00b0'):'sem aviso';
+}
+function girosetgeo(q){
+  return fetch('/setgeo?'+q).then(function(r){
+    if(!r.ok) return r.text().then(function(t){alert('NADA FOI GRAVADO\n\n'+t);});
+    return r.json().then(function(j){if(GIROD){GIROD.gn=j.gn;GIROD.gp=j.gp;GIROD.gq=j.gq;}atualizaOvg();});
+  }).catch(function(){alert('n\u00e3o consegui falar com o gateway.');});
+}
+segurar(document.getElementById('ensg'),function(){OVG.className='on';atualizaOvg();});
+document.getElementById('ovgf').onclick=function(){OVG.className='';};
+document.getElementById('ovgn').onclick=function(){girosetgeo('giroensina=neg');};
+document.getElementById('ovgp2').onclick=function(){girosetgeo('giroensina=pos');};
+document.getElementById('ovgl').onclick=function(){
+  if(confirm('APAGAR OS LIMITES DE GIRO\n\nO giro volta a andar at\u00e9 o fim do curso, sem aviso e sem trava.'))girosetgeo('giroapaga=tudo');};
+document.getElementById('ovgpm').onclick=function(){var q=Math.max(0,((GIROD&&GIROD.gq)||0)-1);girosetgeo('giropre='+q);};
+document.getElementById('ovgpp').onclick=function(){var q=Math.min(45,((GIROD&&GIROD.gq)||0)+(((GIROD&&GIROD.gq)||0)>0?1:5));girosetgeo('giropre='+q);};
+
+// Tela cheia no primeiro toque: tira a barra do navegador onde ele deixa
+// (Chrome). Na janela de login do Android e no WebView pode nao haver
+// suporte — ai nao faz nada. Nos navegadores, so vale depois de um toque.
+document.addEventListener('touchstart',function tc(){
+  document.removeEventListener('touchstart',tc);
+  var el=document.documentElement,f=el.requestFullscreen||el.webkitRequestFullscreen;
+  if(f&&!document.fullscreenElement){try{var r=f.call(el);if(r&&r.catch)r.catch(function(){});}catch(x){}}
+});
+function pavMax(){return GEO?Math.max(0,limNovo-GEO.l0-0.1):0;}
+function mostraPav(){
+  PAVV.textContent=pav.toFixed(2)+' m';
+  PAVT.textContent=pav>0?('Bipa a partir de '+(limNovo-pav).toFixed(2)+' m e trava em '+limNovo.toFixed(2)+' m.')
+                        :'Sem pré-aviso: nenhum bipe antes da trava.';
+}
+function ensinar(){
+  if(!confirm('ENSINAR LIMITE\n\nBraço e lança estão no ponto MAIS ALTO que é seguro ir, com a máquina PARADA?\n\n'+
+              'A altura desta pose vira o limite: acima dela braço e lança TRAVAM.'))return;
+  fetch('/setgeo?ensinar=1').then(function(r){
+    if(!r.ok) return r.text().then(function(t){alert('NADA FOI GRAVADO\n\n'+t);});
+    return r.json().then(function(j){
+      limNovo=j.limite;
+      pav=j.preaviso>0?j.preaviso:0.5;
+      pav=Math.min(pav,pavMax());
+      document.getElementById('oveh').textContent='LIMITE GRAVADO: '+j.limite.toFixed(2).replace('.',',')+' m';
+      mostraPav(); OVE.className='on';
+      carregaGeo();
+    });
+  }).catch(function(){alert('não consegui falar com o gateway.');});
+}
+document.getElementById('pavm').onclick=function(){pav=Math.max(0,Math.round((pav-0.05)*100)/100);mostraPav();};
+document.getElementById('pavp').onclick=function(){pav=Math.min(pavMax(),Math.round((pav+0.05)*100)/100);mostraPav();};
+document.getElementById('pavno').onclick=function(){OVE.className='';};
+document.getElementById('pavok').onclick=function(){
+  fetch('/setgeo?preaviso='+pav.toFixed(2)).then(function(r){
+    if(!r.ok) return r.text().then(function(t){alert('pré-aviso RECUSADO\n\n'+t);});
+    OVE.className=''; carregaGeo();
+  }).catch(function(){alert('não consegui falar com o gateway.');});
+};
+
+var B=document.body,E=document.getElementById('est'),F=document.getElementById('folga'),
+    U=document.getElementById('un'),R=document.getElementById('rot'),P=document.getElementById('pe'),
+    N=null;
+// Sem dado nao se inventa estado: a tela diz que perdeu contato, e nao "tudo bem".
+var falhas=0;
+function pinta(c){B.className=c;}
+// Limite de GIRO programado: o aviso e a trava aparecem por cima do estado da altura, mesmo sem a altura configurada (a trava de giro
+// vale por si so). gd: -1 = lado negativo, +1 = lado positivo.
+function giroSobrepoe(d){
+  var lado=(d.gd<0)?'\u2212':'+';
+  if(d.ge===2){
+    pinta('al');E.className='piscar';E.textContent='PARE \u2014 LIMITE DE GIRO '+lado;
+    R.textContent='limite de giro ultrapassado \u2014 volte o giro';return true;
+  }
+  if(d.ge===1&&d.alarme!==1){
+    pinta('at');E.className='';E.textContent='PR\u00c9-AVISO \u2014 GIRO '+lado;
+    R.textContent='perto do limite de giro';return true;
+  }
+  return false;
+}
+function ciclo(){
+  if(!GEO)carregaGeo();      // o /geo pode ter falhado no carregamento (gateway ainda subindo); sem ele a pose nao e desenhada
+  fetch('/all').then(function(r){return r.json();}).then(function(d){
+    falhas=0;
+    instrumentos(d);
+    // Sem geometria configurada nao existe altura para mostrar. Exibir um
+    // numero aqui seria pior que nao exibir nada: pareceria protegido.
+    // CALIBRACAO E PRE-REQUISITO, nao detalhe. Os offsets tem valor padrao, e
+    // um padrao PARECE configuracao: sem zerar, a altura calculada e ficcao —
+    // pode acusar folga onde nao ha. Por isso a tela bloqueia a leitura em vez
+    // de mostrar um numero ao lado de um aviso pequeno: numero grande na tela
+    // e o que o operador obedece, e ele nao deve obedecer este.
+    if(!d.cal){
+      pinta('na');E.textContent='CALIBRAR ANTES DE OPERAR';E.className='piscar';
+      F.textContent='--';U.textContent='';
+      R.textContent='zere os sensores com a máquina na posição indicada. '+
+                    'Sem isso a altura mostrada não vale.';
+      P.textContent='';
+      // Calibrar AQUI, e nao no painel do tecnico: a tela esta pedindo a acao,
+      // mandar para outro lugar e atrito no pior momento. A salvaguarda nao e
+      // esconder o botao — e CONFIRMAR A POSICAO, porque zerar com o braco
+      // levantado e pior que nao calibrar: o sistema passa a achar que aquilo
+      // e a horizontal, e a protecao some sem ninguem notar.
+      C.className='on';
+      CB.className=d.calb?'ok':'';CB.textContent=d.calb?'BRAÇO ✓':'ZERAR BRAÇO';
+      CL.className=d.call?'ok':'';CL.textContent=d.call?'LANÇA ✓':'ZERAR LANÇA';
+      // Desenha mesmo sem calibracao: e assim que se CONFERE o zero. Depois de
+      // zerar com a maquina na horizontal, o desenho tem de mostrar horizontal.
+      desenhar(d.t1,d.t2,0,false);
+      giroSobrepoe(d);
+      if(confAberta) conferir(d);
+      return;
+    }
+    // Sem limite ensinado nao existe folga para mostrar — mas a POSE sim: e
+    // olhando o desenho que se leva a maquina ate o ponto seguro para ensinar.
+    // Vem DEPOIS da calibracao: ensinar exige os zeros, entao a tela pede
+    // primeiro o que vem primeiro (antes pedia o limite e escondia os zeros).
+    if(!d.geo){
+      pinta('na');E.textContent='NAO CONFIGURADA';E.className='';F.textContent='--';U.textContent='';
+      R.textContent='leve a máquina ao ponto mais alto seguro e SEGURE "ENSINAR LIMITE"';
+      P.textContent='';C.className='';
+      desenhar(d.t1,d.t2,0,false);
+      giroSobrepoe(d);
+      if(confAberta) conferir(d);
+      return;
+    }
+    C.className='';
+    var folga=d.lim-d.hMax;                 // metros ate disparar
+    var alarme=d.alarme===1;
+    // Ambar = o mesmo pre-aviso que faz o buzzer bipar, decidido pelo gateway.
+    // Tela e buzzer nao podem discordar sobre quando a maquina esta perto.
+    var atencao=!alarme&&d.aviso===1;
+    pinta(alarme?'al':(atencao?'at':''));
+    E.className=alarme?'piscar':'';
+    E.textContent=alarme?('PARE — '+(d.motivo||'limite')):(atencao?'PRÉ-AVISO':'LIVRE');
+    F.textContent=(folga>=0?folga:0).toFixed(1).replace('.',',');
+    U.textContent=' m';
+    R.textContent=alarme?'limite ultrapassado':'';
+    giroSobrepoe(d);
+    var av=[];
+    if(d.stale) av.push('SENSOR SEM SINAL');
+    desenhar(d.t1,d.t2,d.lim,alarme,d.pav);
+    if(confAberta) conferir(d);
+    P.textContent=(av.length?av.join(' · ')+' · ':'')+'altura '+d.hMax.toFixed(2)+' m · limite '+d.lim.toFixed(2)+' m';
+    if(d.stale){pinta('al');E.textContent='SENSOR SEM SINAL';E.className='piscar';}
+  }).catch(function(){
+    // Duas falhas seguidas (~1s) e queda de verdade, nao soluco de WiFi.
+    if(++falhas>=2){pinta('na');E.textContent='SEM CONTATO';E.className='piscar';
+      F.textContent='--';U.textContent='';R.textContent='o gateway parou de responder';P.textContent='';}
+  });
+}
+ciclo();setInterval(ciclo,500);
+</script></body></html>

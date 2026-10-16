@@ -39,6 +39,17 @@ button:hover { border-color: var(--steel); }
 #dash { position: fixed; left: 0; top: 0; z-index: 50; border: 0; background: #000; display: none; width: 100%; height: calc(100% - 44px); }
 #bVolta { position: fixed; z-index: 51; left: 0; right: 0; bottom: 0; height: 44px; display: none; border-radius: 0; font-size: 15px; }
 body.noDash #dash, body.noDash #bVolta { display: block; }
+/* DASH em MINIATURA (picture-in-picture) sobre a simulacao: pequeno, semitransparente, so para mostrar o sincronismo. A tela dele e o dash de
+   1024x600 reduzido por CSS (o layout continua o do tablet); so a barrinha de cima recebe toque (arrastar, tela cheia, fechar). */
+#pip { position: fixed; z-index: 30; display: none; border: 1px solid rgba(255,255,255,.28); border-radius: 10px; overflow: hidden;
+  background: rgba(0,0,0,.35); opacity: .8; box-shadow: 0 6px 22px rgba(0,0,0,.5); }
+body.pipOn #pip { display: block; }
+#pipBar { height: 24px; display: flex; align-items: center; gap: 4px; padding: 0 4px 0 8px; font-size: 11px; letter-spacing: .06em; color: var(--ink-soft);
+  background: rgba(20,22,15,.92); cursor: move; touch-action: none; user-select: none; }
+#pipBar span { flex: 1; white-space: nowrap; overflow: hidden; }
+#pipBar button { padding: 0 7px; height: 20px; font-size: 13px; line-height: 1; }
+#pipTela { position: relative; pointer-events: none; overflow: hidden; }
+#pipTela iframe { position: absolute; left: 0; top: 0; width: 1024px; height: 600px; border: 0; transform-origin: 0 0; background: #0d1a12; }
 button.on { background: var(--accent); color: #1A1200; border-color: var(--accent); font-weight: 600; }
 .sp { flex: 1; }
 
@@ -181,9 +192,12 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <label class="opac" title="Transparência dos transferidores">opacidade <input type="range" id="rOpac" min="5" max="100" value="100"></label>
   <button id="bTela">⛶ Tela cheia</button>
   <button id="bDash" style="display:none" title="Mostra o painel do operador (dash) como a grua real o mostra">▣ DASH</button>
+  <button id="bDashJan" style="display:none" title="Abre o dash em outra janela (ou outra tela), sincronizado com esta simulação">⧉ Dash em janela</button>
 </header>
 <iframe id="dash" title="Dash do operador"></iframe>
 <button id="bVolta">◀ SIMULADOR</button>
+<div id="pip"><div id="pipBar"><span>DASH · sincronizado</span><button id="pipMax" title="Dash em tela cheia">⤢</button><button id="pipX" title="Fechar a miniatura">✕</button></div>
+  <div id="pipTela"><iframe id="dashPip" title="Dash (miniatura)" tabindex="-1"></iframe></div></div>
 
 <aside id="ctl"></aside>
 
@@ -485,6 +499,7 @@ function passa(dt) {
   const sobe = S.vel.b > 0.4 || S.vel.l > 0.4;
   S.pressao += ((!mov ? P_REP : sobe ? P_SOBE : P_DESCE) - S.pressao) * Math.min(1, dt * (mov ? 3 : 1.5));   // sobe rápido ao mover, cai devagar ao parar
   S.movendo = { g: Math.abs(S.vel.g) > 0.8, b: Math.abs(S.vel.b) > 0.4, l: Math.abs(S.vel.l) > 0.4 };
+  if (mov) dashHor.opS += dt;                                  // horimetro de operacao do dash web
 }
 
 /* ============ Peso na garra (SIMULADO) e carga maxima no raio ============
@@ -561,15 +576,16 @@ function avaliaGiro() {
   }
   S.gEst = est; S.gLado = est ? lado : 0; S.gPerto = perto;
 }
-function giroGravar(lado) {
-  if (Math.abs(S.vel.g) > 0.5) { log('Recusado: pare o giro para gravar o limite'); return; }          // como o limite de altura: com a máquina PARADA
+function giroGravar(lado) {            // devolve null se gravou, ou o motivo da recusa
+  if (Math.abs(S.vel.g) > 0.5) { log('Recusado: pare o giro para gravar o limite'); return 'maquina em movimento: pare o giro para gravar o limite'; }          // como o limite de altura: com a máquina PARADA
   // arredonda ao decimo de grau PARA DENTRO da janela: para fora, o limite nascia aquem de onde a grua esta e travava na hora de gravar
   const a = lado < 0 ? Math.floor(S.giro * 10 + 1e-3) / 10 : Math.ceil(S.giro * 10 - 1e-3) / 10;
   const neg = lado < 0 ? a : S.gNeg, pos = lado < 0 ? S.gPos : a;
-  if (neg !== null && pos !== null && pos - neg < GIRO_JANELA_MIN) { log(`Recusado: os limites de giro precisam ficar a ${GIRO_JANELA_MIN}° um do outro`); return; }
+  if (neg !== null && pos !== null && pos - neg < GIRO_JANELA_MIN) { log(`Recusado: os limites de giro precisam ficar a ${GIRO_JANELA_MIN}° um do outro`); return `limites do giro muito proximos (minimo de ${GIRO_JANELA_MIN} graus entre os dois)`; }
   if (lado < 0) S.gNeg = a; else S.gPos = a;
   log(`LIMITE DE GIRO ${lado < 0 ? '−' : '+'} gravado em ${fmt(a, 1)}°`);
   giroConfPre(); avaliaGiro(); atualizaGiroUI();
+  return null;
 }
 function atualizaGiroUI() {
   const v = x => x === null ? '—' : fmt(x, 0) + '°';
@@ -581,6 +597,72 @@ function ligaGiroUI() {
   $('gPreSel').onchange = e => { S.gPre = +e.target.value; giroConfPre(); avaliaGiro(); log(S.gPre > 0 ? `Aviso de giro: ${S.gPre}° antes do limite` : 'Aviso de giro desligado'); };
   $('gLimpa').onclick = () => { S.gNeg = S.gPos = null; S.gEst = 0; S.gLado = 0; atualizaGiroUI(); log('Limites de giro apagados'); };
 }
+
+/* ============ Dash web: um "gateway" de mentira para a /op ============
+ * A /op (firmware/shared/web/op.html, copiada para dash.html por hfort40/tools/gera-dash-web.py) so conversa por /all, /geo e /setgeo. Aqui a
+ * pagina PUBLICA o estado do simulador num BroadcastChannel ('hfort-sim', 10 Hz) no mesmo formato do /all do gateway, e atende os comandos
+ * que a /op manda (ensinar limite, pre-aviso, limites de giro). O dash ve exatamente o que o simulador esta vivendo, na mesma aba (DASH),
+ * numa janela ao lado ou em outra tela. Onde nao ha BroadcastChannel o DASH simplesmente nao aparece. */
+const T0 = performance.now();
+function jsonAllDash() {
+  const [l0, l1, l2] = MODELOS[S.modelo], ex = EXTRAS[S.modelo] || {}, h = alturas(), hMax = Math.max(h.hE, h.hT);
+  const alarme = S.alarme || S.gEst === 2, cm = cargaMaxKg(), pk = pesoKg();
+  const ra = l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2));
+  const seg = (performance.now() - T0) / 1000;
+  return {
+    g: +giroSaida().toFixed(2), gm: 1, b: +S.t1.toFixed(2), l: +(S.t1 - S.t2).toFixed(2), p: +S.pressao.toFixed(1), t: +(32 + Math.min(S.pressao, 200) * 0.06).toFixed(1),
+    w: pk, stale: 0, alarme: alarme ? 1 : 0, motivo: S.alarme ? 'acima do limite' : (S.gEst === 2 ? 'limite de giro' : ''),
+    t1: +S.t1.toFixed(2), t2: +S.t2.toFixed(2), hMax: +hMax.toFixed(2), lim: S.limite, pav: +(S.limite - S.pre).toFixed(2),
+    aviso: (!alarme && (S.pregao || S.gEst === 1)) ? 1 : 0, geo: 1, cal: 1, calb: 1, call: 1,
+    hop: +(dashHor.op + dashHor.opS / 3600).toFixed(3), hup: +(dashHor.up + seg / 3600).toFixed(3), gl: GIRO_LIM[1],
+    ra: +ra.toFixed(2), cm: cm === null ? null : Math.round(cm), tr: ex.tara || 0,
+    gn: S.gNeg, gp: S.gPos, gq: S.gPre, ge: S.gEst, gd: S.gLado,
+  };
+}
+const dashHor = { up: 19.7, op: 12.4, opS: 0 };                    // horas "de fabrica" do horimetro simulado
+function jsonGeoDash() {
+  const [l0, l1, l2] = MODELOS[S.modelo];
+  return { modelo: Object.keys(MODELOS).indexOf(S.modelo), nome: S.modelo, l0, l1, l2, limite: S.limite, preaviso: S.pre, offBraco: 0, offLanca: 0, calb: 1, call: 1, pose: 0, configurada: 1, pmax: 600 };
+}
+function comandoDash(url) {                                  // atende /setgeo, /setconfig e /sethor da /op; devolve {st, corpo, json}
+  const [rota, q = ''] = url.split('?'), P = new URLSearchParams(q);
+  if (rota === '/setconfig' || rota === '/sethor') return { st: 200, corpo: rota === '/sethor' ? '{"zerado":0}' : 'ok', json: rota === '/sethor' };
+  if (P.has('ensinar')) {                                    // limite de ALTURA na pose de agora (como o botao ENSINAR LIMITE da pagina)
+    const l0 = MODELOS[S.modelo][0], h = maxH(S.t1, S.t2);
+    if (h < l0 + 0.5) return { st: 409, corpo: 'pose baixa demais para ser o limite (braco quase deitado)', json: false };
+    S.limite = Math.round(h * 20) / 20; S.alarme = false; $('inLim').value = S.limite.toFixed(2); log('LIMITE ENSINADO (pelo dash) ' + fmt(S.limite) + ' m');
+    return { st: 200, corpo: JSON.stringify({ limite: S.limite, preaviso: S.pre }), json: true };
+  }
+  const giroResp = () => ({ st: 200, corpo: JSON.stringify({ gn: S.gNeg, gp: S.gPos, gq: S.gPre }), json: true });
+  if (P.has('giroensina')) {
+    const l = P.get('giroensina'), e = l === 'neg' ? giroGravar(-1) : l === 'pos' ? giroGravar(1) : 'lado do giro invalido (neg ou pos)';
+    return e ? { st: 409, corpo: e, json: false } : giroResp();
+  }
+  if (P.has('giroapaga')) { const l = P.get('giroapaga'); if (l !== 'pos') S.gNeg = null; if (l !== 'neg') S.gPos = null; if (S.gNeg === null && S.gPos === null) { S.gPre = 0; $('gPreSel').value = '0'; } S.gEst = 0; S.gLado = 0; atualizaGiroUI(); log('Limites de giro apagados (pelo dash)'); return giroResp(); }
+  if (P.has('gironeg') || P.has('giropos')) {
+    const v = k => P.get(k) === 'null' ? null : parseFloat(P.get(k)), ng = P.has('gironeg') ? v('gironeg') : S.gNeg, ps = P.has('giropos') ? v('giropos') : S.gPos;
+    if (ng !== null && ps !== null && ps - ng < GIRO_JANELA_MIN) return { st: 409, corpo: 'limites do giro muito proximos (minimo de 10 graus entre os dois)', json: false };
+    S.gNeg = ng; S.gPos = ps; giroConfPre(); atualizaGiroUI(); return giroResp();
+  }
+  if (P.has('giropre')) {
+    const v = parseFloat(P.get('giropre'));
+    if (!(v >= 0) || v > 45) return { st: 409, corpo: 'aviso de giro: no maximo 45 graus', json: false };
+    if (v > 0 && S.gNeg === null && S.gPos === null) return { st: 409, corpo: 'programe um limite de giro antes', json: false };
+    S.gPre = v; $('gPreSel').value = String(v); giroConfPre(); avaliaGiro(); return giroResp();
+  }
+  if (P.has('preaviso')) { const v = parseFloat(P.get('preaviso')); if (!(v >= 0) || S.limite - v < MODELOS[S.modelo][0] + 0.1) return { st: 409, corpo: 'pre-aviso grande demais: biparia com a maquina deitada', json: false }; S.pre = v; $('selPre').value = String(v); log('Pré-aviso ' + fmt(v) + ' m (pelo dash)'); return { st: 200, corpo: 'ok', json: false }; }
+  return { st: 200, corpo: 'ok', json: false };            // zerabraco, zeralanca, modelo...: a grua simulada ja nasce calibrada
+}
+let canalDash = null;
+try {
+  canalDash = new BroadcastChannel('hfort-sim');
+  canalDash.onmessage = e => {
+    const m = e.data || {};
+    if (m.t === 'cmd') { const r = comandoDash(m.u); canalDash.postMessage({ t: 'resp', id: m.id, st: r.st, corpo: r.corpo, json: r.json }); }
+    else if (m.t === 'oi') canalDash.postMessage({ t: 'estado', ts: Date.now(), all: jsonAllDash(), geo: jsonGeoDash() });
+  };
+  setInterval(() => { if (NATIVO) return; try { canalDash.postMessage({ t: 'estado', ts: Date.now(), all: jsonAllDash(), geo: jsonGeoDash() }); } catch (e) {} }, 100);   // no app o dash e a /op NATIVA do nucleo: nada a publicar
+} catch (e) { canalDash = null; }
 
 /* ============ Som ============ */
 let ctx = null, mudo = false, proxBip = 0;
@@ -1396,6 +1478,38 @@ fetch('modelos-extras.json').then(r => r.ok ? r.json() : null).then(j => {
 // ?gateway=1 no endereço liga a saída para o gateway 101 sozinha (feira: ninguém precisa clicar)
 if (new URLSearchParams(location.search).has('gateway') || NATIVO) $('bBle').click();
 // No app da grua: DASH abre o painel real (/op, servido pelo próprio app) por cima; o simulador segue rodando por baixo.
+if (!NATIVO && canalDash) {     // versao WEB: o dash (dash.html, a mesma /op do gateway) vem do gateway de mentira acima, por BroadcastChannel
+  $('bDash').style.display = ''; $('bDashJan').style.display = '';
+  const pip = $('pip'), ifr = $('dashPip'), tela = $('pipTela'), fr = $('dash');
+  const ajustaPip = () => {            // tamanho da miniatura: ~40% da largura (maximo 440 px; 56% no celular), o dash de 1024x600 escalado por CSS
+    const W = Math.round(Math.min(innerWidth * (innerWidth < 761 ? 0.56 : 0.4), 440)), k = W / 1024;
+    tela.style.width = W + 'px'; tela.style.height = Math.round(600 * k) + 'px';
+    ifr.style.transform = `scale(${k})`;
+    const r = pip.getBoundingClientRect();
+    if (!pip.dataset.moveu) { pip.style.left = Math.max(8, innerWidth - W - (innerWidth < 761 ? 8 : 292)) + 'px'; pip.style.top = (innerWidth < 761 ? 100 : 56) + 'px'; }
+    else { pip.style.left = Math.min(r.left, innerWidth - W - 4) + 'px'; }
+  };
+  const mostraPip = on => {
+    document.body.classList.toggle('pipOn', on); $('bDash').classList.toggle('on', on);
+    if (on) { if (!ifr.getAttribute('src')) ifr.src = 'dash.html'; ajustaPip(); }
+  };
+  $('bDash').onclick = () => mostraPip(!document.body.classList.contains('pipOn'));
+  $('pipX').onclick = () => mostraPip(false);
+  $('pipMax').onclick = () => { mostraPip(false); if (!fr.getAttribute('src')) fr.src = 'dash.html'; document.body.classList.add('noDash'); };   // tela cheia (e a miniatura some)
+  $('bVolta').onclick = () => { document.body.classList.remove('noDash'); mostraPip(true); };
+  $('bDashJan').onclick = () => { mostraPip(false); window.open('dash.html', 'hfort-dash', 'width=1024,height=620'); };
+  addEventListener('resize', () => { if (document.body.classList.contains('pipOn')) ajustaPip(); });
+  // arrastar pela barrinha
+  let arr = null;
+  $('pipBar').addEventListener('pointerdown', e => { if (e.target.tagName === 'BUTTON') return; const r = pip.getBoundingClientRect(); arr = { dx: e.clientX - r.left, dy: e.clientY - r.top }; e.currentTarget.setPointerCapture(e.pointerId); });
+  $('pipBar').addEventListener('pointermove', e => {
+    if (!arr) return; pip.dataset.moveu = '1';
+    pip.style.left = Math.max(0, Math.min(innerWidth - pip.offsetWidth, e.clientX - arr.dx)) + 'px';
+    pip.style.top = Math.max(0, Math.min(innerHeight - 30, e.clientY - arr.dy)) + 'px';
+  });
+  const solta = () => { arr = null; };
+  $('pipBar').addEventListener('pointerup', solta); $('pipBar').addEventListener('pointercancel', solta);
+}
 if (NATIVO) {
   $('bBle').style.display = 'none'; $('bDash').style.display = '';
   const fr = $('dash');
