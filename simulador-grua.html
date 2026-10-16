@@ -536,7 +536,9 @@ function avaliaGiro() {
   S.gEst = est; S.gLado = est ? lado : 0; S.gPerto = perto;
 }
 function giroGravar(lado) {
-  const a = Math.round(S.giro * 10) / 10;
+  if (Math.abs(S.vel.g) > 0.5) { log('Recusado: pare o giro para gravar o limite'); return; }          // como o limite de altura: com a máquina PARADA
+  // arredonda ao decimo de grau PARA DENTRO da janela: para fora, o limite nascia aquem de onde a grua esta e travava na hora de gravar
+  const a = lado < 0 ? Math.floor(S.giro * 10 + 1e-3) / 10 : Math.ceil(S.giro * 10 - 1e-3) / 10;
   const neg = lado < 0 ? a : S.gNeg, pos = lado < 0 ? S.gPos : a;
   if (neg !== null && pos !== null && pos - neg < GIRO_JANELA_MIN) { log(`Recusado: os limites de giro precisam ficar a ${GIRO_JANELA_MIN}° um do outro`); return; }
   if (lado < 0) S.gNeg = a; else S.gPos = a;
