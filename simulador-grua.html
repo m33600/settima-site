@@ -177,6 +177,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <button id="bSom">🔊 Som</button>
   <button id="bBle" title="Manda os ângulos e a pressão para o gateway 101 simulado (rede GATEWAY-101), que o tablet mostra como se fosse a grua. Rode  sim-gateway --ap INTERFACE --abrir  neste PC e use esta mesma página em http://127.0.0.1:8101/sim">◉ Gateway 101</button>
   <button id="bTransf" class="on">◜ Transferidores</button>
+  <button id="bForcas" title="Setas de força em N: pesos, reações nos pinos e momentos (estimativas ~, só no TITAN 6700)">→ Forças</button>
   <label class="opac" title="Transparência dos transferidores">opacidade <input type="range" id="rOpac" min="5" max="100" value="100"></label>
   <button id="bTela">⛶ Tela cheia</button>
   <button id="bDash" style="display:none" title="Mostra o painel do operador (dash) como a grua real o mostra">▣ DASH</button>
@@ -262,7 +263,9 @@ const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390]
 // A ORDEM de MODELOS importa: o índice na tabela do núcleo do gateway é a posição aqui (modelo novo sempre no fim).
 // Produto AINDA NÃO lançado não entra aqui: vai num modelos-extras.json servido só pelo gateway local (ver o carregador no fim do script).
 // carga = tabela PUBLICADA pelo fabricante [alcance mm, kg], SEM garra e SEM rotator; tara = o peso dos dois (315 kg no Titan): e a carga da simulacao.
-const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, tara: 315, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
+// massa: ESTIMATIVA (kg) da folha do fabricante (1500 kg "sem link, rotator e base") repartida em coluna 30%, braco 42% e lanca 28%;
+// as setas de forca que dependem dela levam "~". Trocar por dados da fabrica quando houver (massa por parte, pontos dos cilindros).
+const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, tara: 315, massa: { col: 450, braco: 630, lanca: 420 }, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
 const HIST = 0.05;
 // Giro do 8800LI: 420° de curso, simétrico em volta do zero (±210°), com batente nas duas pontas.
 // O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido no sentido anti-horário visto de cima:
@@ -489,7 +492,7 @@ function passa(dt) {
  * Mais o tremor de uma balanca. Entra no gateway pelo mesmo campo do sensor de peso real. O MAXIMO mostrado e o da tabela PUBLICADA do
  * fabricante (sem garra e sem rotator), interpolado no raio atual (a mesma conta do nucleo); so onde o modelo tem tabela. */
 const GRAV = 9.81, CABO = 1.4, PEND_W0 = Math.sqrt(GRAV / CABO), PEND_Z = 0.12, PEND_K = 0.5, AZ_K = 0.5;
-const dinam = { hAnt: null, vz: 0, az: 0, omega: 0, at: 0, th: 0, thv: 0, trem: 0, tremT: 0 };
+const dinam = { hAnt: null, vz: 0, az: 0, omega: 0, at: 0, alfa: 0, th: 0, thv: 0, trem: 0, tremT: 0 };
 function atualizaPeso(dt) {
   const ex = EXTRAS[S.modelo];
   if (!(ex && ex.carga)) { S.peso = null; dinam.hAnt = null; return; }
@@ -502,6 +505,7 @@ function atualizaPeso(dt) {
   dinam.az += (Math.max(-6, Math.min(6, (vz - dinam.vz) / dt)) - dinam.az) * k; dinam.vz = vz;       // aceleracao vertical da ponta, m/s2
   const [, l1, l2] = MODELOS[S.modelo], raio = l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2));
   const omega = -rad(S.vel.g);                                             // rad/s
+  dinam.alfa += (Math.max(-6, Math.min(6, (omega - dinam.omega) / dt)) - dinam.alfa) * k;                     // aceleracao angular do giro, rad/s2 (para o torque)
   dinam.at += (Math.max(-12, Math.min(12, raio * (omega - dinam.omega) / dt)) - dinam.at) * k; dinam.omega = omega;   // aceleracao lateral da ponta, m/s2
   // PEND_K e AZ_K: a grua de verdade acelera mais suave que o modelo do simulador (constante de tempo de 0,25 s), entao as duas
   // aceleracoes entram reduzidas. A = aceleracao lateral do apoio do pendulo; ge = gravidade efetiva na vertical.
@@ -743,6 +747,7 @@ function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
   const A = [Q[0] + kn.a * Math.cos(thA), Q[1] + kn.a * Math.sin(thA)];
   const C = kn.Cx !== undefined ? [l1 + kn.Cx, kn.Cw] : [kn.Cu * l1, kn.Qw], Y = kn.Y, AC = [75, 80, 78], PN = [34, 36, 34], BI = [190, 194, 186];
   const P = (q, y = Y) => to3(q[0], q[1], y);
+  joelho.geo = { B, R, K: [l1, -kn.KA] };          // para as setas de forca (estatica): coordenadas (u, w) do braco, a partir do pivo
 
   // bloco do joelho: carcaça no fim do braço + pino atravessando até a lança e as placas
   viga(f, to3(l1 - 0.35, -0.12, 0), to3(l1 + 0.02, -0.12, 0), 0.4, 0.62, S.modelo === 'TITAN6700' ? [28, 92, 48] : [170, 120, 24]);   // carcaca do joelho (verde escuro no Titan)
@@ -1009,6 +1014,101 @@ function setoresGiro() {
   return { f, t };
 }
 
+/* ============ Forcas (estatica) ============
+ * Setas vetoriais em NEWTONS nos pontos que importam, no plano vertical do braco, por equilibrio estatico (peso mais a leitura dinamica da carga):
+ *   PESOS    - coluna, braco e lanca no centro de gravidade, e a carga (garra + rotator) na garra, com o peso que o sensor le agora;
+ *   REACOES  - no pino do joelho (a lanca equilibra o seu peso, a carga e a forca do link B-R), no pino do braco (braco + lanca + carga contra
+ *              o cilindro de elevacao) e na base da coluna (todo o peso, para cima);
+ *   MOMENTOS - de tombamento na base (kN.m) e o torque de giro (inercia x aceleracao angular), contra os 78 e 27,5 kN.m da folha.
+ * As massas por parte e a geometria dos cilindros sao ESTIMADAS (valor com "~"); so a carga (315 kg x g) e dado do fabricante.
+ * Escala das setas (para caberem na tela): pesos 1 kN = 28 cm; reacoes 1 kN = 3 cm (elas chegam a mais de 100 kN). */
+let mostraForcas = false;
+const FCOR = { peso: '#F2E9B8', reacao: '#5FE3FF', mom: '#FF9F5A' };
+function estatica() {
+  const ex = EXTRAS[S.modelo]; if (!(ex && ex.massa)) return null;
+  const [l0, l1, l2] = MODELOS[S.modelo], kn = knAtual(), c = Math.cos, sn = Math.sin, t1 = rad(S.t1), a2 = rad(S.t1 - S.t2);
+  const W = { col: ex.massa.col * GRAV, braco: ex.massa.braco * GRAV, lanca: ex.massa.lanca * GRAV, carga: (S.peso === null ? ex.tara : S.peso) * GRAV };
+  const P0 = [0, l0], P1 = [l1 * c(t1), l0 + l1 * sn(t1)], nB = [-sn(t1), c(t1)], dL = [c(a2), sn(a2)], nL = [-sn(a2), c(a2)];
+  const K = [P1[0] - nB[0] * kn.KA, P1[1] - nB[1] * kn.KA], J1 = [K[0] + nL[0] * kn.KL, K[1] + nL[1] * kn.KL], J2 = [J1[0] + dL[0] * l2, J1[1] + dL[1] * l2];
+  const cgBraco = [P0[0] + c(t1) * l1 / 2, P0[1] + sn(t1) * l1 / 2], cgLanca = [J1[0] + dL[0] * l2 / 2, J1[1] + dL[1] * l2 / 2];
+  const cgCol = [0, (1.068 + l0 - 0.25) / 2];
+  const kz = Math.min(1, Math.max(0.2, (J2[1] + 0.0) / 1.40)), garra = [J2[0], J2[1] - 0.8 * kz];     // onde a garra pende (ver constroi)
+  const toXZ = (u, w) => [P0[0] + u * c(t1) - w * sn(t1), P0[1] + u * sn(t1) + w * c(t1)];          // (u, w) do braco -> plano (x radial, z altura)
+  const cruz = (r, d) => r[0] * d[1] - r[1] * d[0];
+  const out = { setas: [], W };
+  const seta = (tipo, nome, p, f, est) => out.setas.push({ tipo, nome, p, f, est });
+  // pesos
+  seta('peso', 'coluna', cgCol, [0, -W.col], true); seta('peso', 'braço', cgBraco, [0, -W.braco], true);
+  seta('peso', 'lança', cgLanca, [0, -W.lanca], true); seta('peso', 'carga', garra, [0, -W.carga], false);
+  // joelho: a lanca em equilibrio sobre o pino K, com a forca do link B-R (direcao fixa pela geometria)
+  const g = joelho.geo;
+  if (g) {
+    const Bw = toXZ(g.B[0], g.B[1]), Rw = toXZ(g.R[0], g.R[1]), dl = [Bw[0] - Rw[0], Bw[1] - Rw[1]], nl = Math.hypot(...dl) || 1, d = [dl[0] / nl, dl[1] / nl];
+    const den = cruz([Rw[0] - K[0], Rw[1] - K[1]], d);
+    if (Math.abs(den) > 0.03) {
+      const Fl = ((cgLanca[0] - K[0]) * W.lanca + (J2[0] - K[0]) * W.carga) / den;                  // N, + = o link puxa a lanca para B
+      seta('reacao', 'pino do joelho', K, [-Fl * d[0], W.lanca + W.carga - Fl * d[1]], true);
+    }
+  }
+  // pino do braco: braco + lanca + carga contra o cilindro de elevacao (do desenho: base na coluna, haste a 28% do braco)
+  const C0 = [-0.35, l0 - 0.6], C1 = [0.28 * l1 * c(t1), l0 + 0.28 * l1 * sn(t1) - 0.12], dc0 = [C1[0] - C0[0], C1[1] - C0[1]], nc = Math.hypot(...dc0) || 1, dc = [dc0[0] / nc, dc0[1] / nc];
+  const denC = cruz([C1[0] - P0[0], C1[1] - P0[1]], dc), Wsup = W.braco + W.lanca + W.carga;
+  const Mw = cgBraco[0] * W.braco + cgLanca[0] * W.lanca + garra[0] * W.carga;
+  if (Math.abs(denC) > 0.03) {
+    const Fc = Mw / denC;
+    seta('reacao', 'pino do braço', P0, [-Fc * dc[0], Wsup - Fc * dc[1]], true);
+    out.Fc = Fc;
+  }
+  // base da coluna: todo o peso, para cima
+  const Wtot = W.col + Wsup;
+  seta('reacao', 'base', [0, 0.05], [0, Wtot], true);
+  // momentos: tombamento na base (pesos x bracos) e a parcela so da carga; torque de giro = inercia x aceleracao angular
+  out.Mtomb = cgBraco[0] * W.braco + cgLanca[0] * W.lanca + garra[0] * W.carga;                       // N.m
+  out.Mcarga = garra[0] * W.carga;
+  const m = ex.massa, I = m.braco * cgBraco[0] ** 2 + m.lanca * cgLanca[0] ** 2 + (S.peso === null ? ex.tara : ex.tara) * garra[0] ** 2;   // kg.m2
+  out.Tgiro = I * PEND_K * dinam.alfa;                                                              // N.m
+  out.pos = { P0, garra, raio: garra[0] };
+  return out;
+}
+const fmtN = (n, est) => (est ? '~' : '') + Math.round(Math.abs(n)).toLocaleString('pt-BR') + ' N';
+function seta2d(P, F, esc, cor, rot) {
+  const kN = Math.hypot(F[0], F[1]) / 1000; if (kN < 0.02) return '';
+  const len = Math.min(5, Math.max(0.3, kN * esc)), dir = [F[0] / (kN * 1000), F[1] / (kN * 1000)];
+  const psi = rad(S.giro + GIRO_ZERO), w = (x, z) => loc(psi, x, 0, z);
+  const A = proj(w(P[0], P[1])), B = proj(w(P[0] + dir[0] * len, P[1] + dir[1] * len));
+  const ax = B[0] - A[0], ay = B[1] - A[1], n = Math.hypot(ax, ay) || 1, ux = ax / n, uy = ay / n, h = 11;
+  const pts = `${B[0].toFixed(1)},${B[1].toFixed(1)} ${(B[0] - ux * h - uy * h * .45).toFixed(1)},${(B[1] - uy * h + ux * h * .45).toFixed(1)} ${(B[0] - ux * h + uy * h * .45).toFixed(1)},${(B[1] - uy * h - ux * h * .45).toFixed(1)}`;
+  const tx = B[0] + (ux >= 0 ? 8 : -8), ty = B[1] + (uy >= 0 ? 16 : -6), anc = ux >= 0 ? 'start' : 'end';
+  return `<line x1="${A[0].toFixed(1)}" y1="${A[1].toFixed(1)}" x2="${(B[0] - ux * h * .6).toFixed(1)}" y2="${(B[1] - uy * h * .6).toFixed(1)}" stroke="${cor}" stroke-width="3" stroke-linecap="round"/>` +
+         `<polygon points="${pts}" fill="${cor}"/><circle cx="${A[0].toFixed(1)}" cy="${A[1].toFixed(1)}" r="3.2" fill="${cor}"/>` +
+         `<text x="${tx.toFixed(0)}" y="${ty.toFixed(0)}" fill="${cor}" font-size="15" font-weight="700" text-anchor="${anc}" font-family="monospace" stroke="#14160F" stroke-width="4" paint-order="stroke">${rot}</text>`;
+}
+// seta curva (momento) num plano: centro c3, eixos e1/e2 (3D), arco de a0 a a1 graus; a ponta no fim
+function arcoMomento(c3, e1, e2, r, a0, a1, cor, rot) {
+  const pts = []; const n = 14;
+  for (let i = 0; i <= n; i++) { const a = rad(a0 + (a1 - a0) * i / n); pts.push(proj([0, 1, 2].map(k => c3[k] + r * (Math.cos(a) * e1[k] + Math.sin(a) * e2[k])))); }
+  const B = pts[n], A = pts[n - 1], ax = B[0] - A[0], ay = B[1] - A[1], m = Math.hypot(ax, ay) || 1, ux = ax / m, uy = ay / m, h = 11;
+  const tri = `${B[0].toFixed(1)},${B[1].toFixed(1)} ${(B[0] - ux * h - uy * h * .45).toFixed(1)},${(B[1] - uy * h + ux * h * .45).toFixed(1)} ${(B[0] - ux * h + uy * h * .45).toFixed(1)},${(B[1] - uy * h - ux * h * .45).toFixed(1)}`;
+  const mid = pts[Math.floor(n / 2)];
+  return `<polyline points="${pts.map(q => q[0].toFixed(1) + ',' + q[1].toFixed(1)).join(' ')}" fill="none" stroke="${cor}" stroke-width="3.2" stroke-linecap="round"/><polygon points="${tri}" fill="${cor}"/>` +
+         `<text x="${(mid[0] + 10).toFixed(0)}" y="${(mid[1] - 8).toFixed(0)}" fill="${cor}" font-size="15" font-weight="700" font-family="monospace" stroke="#14160F" stroke-width="4" paint-order="stroke">${rot}</text>`;
+}
+function setasForcas() {
+  const e = estatica(); if (!e) return '';
+  let o = '';
+  for (const a of e.setas) {
+    const esc = a.tipo === 'peso' ? 0.28 : 0.03, cor = FCOR[a.tipo];
+    o += seta2d(a.p, a.f, esc, cor, `${a.nome} ${fmtN(Math.hypot(a.f[0], a.f[1]), a.est)}`);
+  }
+  const psi = rad(S.giro + GIRO_ZERO), er = [Math.cos(psi), Math.sin(psi), 0], nl = [-Math.sin(psi), Math.cos(psi), 0], ez = [0, 0, 1];
+  const kNm = v => (Math.abs(v) / 1000).toFixed(1).replace('.', ',');
+  // momento de tombamento: arco no plano do braco em volta da base (carga: x = radial, z = altura)
+  o += arcoMomento([0, 0, 0.5], er, ez, 1.1, 170, 20, FCOR.mom, `M base ~${kNm(e.Mtomb)} kN·m (carga ${kNm(e.Mcarga)} de 78)`);
+  // torque de giro: arco horizontal em volta do topo da coluna
+  if (Math.abs(e.Tgiro) > 300) o += arcoMomento([0, 0, MODELOS[S.modelo][0] + 0.45], er, nl, 0.9, -60, 200, FCOR.mom, `giro ~${kNm(e.Tgiro)} kN·m (máx 27,5)`);   // so enquanto acelera/freia o giro
+  return o;
+}
+
 function desenhaTransf(P0, P1) {
   if (!mostraTransf) { gTrChao.innerHTML = gTrAr.innerHTML = ''; return; }
   const psi = rad(S.giro + GIRO_ZERO), t1 = rad(S.t1);
@@ -1089,7 +1189,7 @@ function desenha() {
     `<line x1="${a[0]|0}" y1="${a[1]|0}" x2="${b[0]|0}" y2="${b[1]|0}" stroke="${cor}" stroke-width="2" stroke-dasharray="6 6"/>` +
     `<circle cx="${b[0]|0}" cy="${b[1]|0}" r="6" fill="none" stroke="${cor}" stroke-width="2"/>` +
     `<text x="${(a[0] + 14)|0}" y="${(a[1] - 12)|0}" fill="#E8EBDF" font-size="26" font-weight="700" font-family="monospace" stroke="#14160F" stroke-width="5" paint-order="stroke">${fmt(hT)} m</text>` +
-    etiquetaPeso(P2);
+    etiquetaPeso(P2) + (mostraForcas ? setasForcas() : '');
 }
 
 /* O peso FICA NO AR, junto da garra (acompanha a pose e o zoom): o peso na garra e, embaixo, a carga maxima para o raio de agora.
@@ -1195,6 +1295,11 @@ $('bBle').onclick = () => {
 $('bPainel').onclick = () => $('painel').classList.toggle('aberto');
 ligaGiroUI();
 $('bTransf').onclick = () => { mostraTransf = !mostraTransf; $('bTransf').classList.toggle('on', mostraTransf); };
+$('bForcas').onclick = () => {
+  const ex = EXTRAS[S.modelo];
+  if (!mostraForcas && !(ex && ex.massa)) { log('Forças: só onde há massas do fabricante (TITAN 6700)'); return; }
+  mostraForcas = !mostraForcas; $('bForcas').classList.toggle('on', mostraForcas);
+};
 $('bDemo').onclick = alternaDemo;
 $('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; faseDobra = false; log('Estacionando…'); audioLiga(); };
 $('bSom').onclick = () => { mudo = !mudo; $('bSom').textContent = mudo ? '🔇 Mudo' : '🔊 Som'; audioLiga(); };
