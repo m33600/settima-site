@@ -202,7 +202,7 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <div class="lin"><span>Altura da ponta</span><b id="vHT">0 m</b></div>
   <div class="lin"><span>Pressão (simulada)</span><b id="vP">0 bar</b></div>
   <div class="lin" id="linPeso" style="display:none"><span>Peso / máx.</span><b id="vPeso">—</b></div>
-  <div class="lin" id="linCap" style="display:none"><span>Alcance · carga útil</span><b id="vCap">—</b></div>
+  <div class="lin" id="linCap" style="display:none"><span>Alcance · capacidade</span><b id="vCap">—</b></div>
   <div class="lin"><span>Gateway 101</span><b id="vBle">desligada</b></div>
   <div class="cfg">
     <label>Modelo
@@ -261,7 +261,7 @@ const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390]
 // Dados por modelo além das medidas: rótulo, curso total do giro (graus) e tabela de capacidade [alcance mm, kg] do fabricante.
 // A ORDEM de MODELOS importa: o índice na tabela do núcleo do gateway é a posição aqui (modelo novo sempre no fim).
 // Produto AINDA NÃO lançado não entra aqui: vai num modelos-extras.json servido só pelo gateway local (ver o carregador no fim do script).
-// carga = tabela do fabricante [alcance mm, kg] SEM garra e SEM rotator; tara = o peso dos dois (315 kg no Titan), que sai da carga util.
+// carga = tabela PUBLICADA pelo fabricante [alcance mm, kg], SEM garra e SEM rotator; tara = o peso dos dois (315 kg no Titan): e a carga da simulacao.
 const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, tara: 315, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
 const HIST = 0.05;
 // Giro do 8800LI: 420° de curso, simétrico em volta do zero (±210°), com batente nas duas pontas.
@@ -480,30 +480,48 @@ function passa(dt) {
   S.movendo = { g: Math.abs(S.vel.g) > 0.8, b: Math.abs(S.vel.b) > 0.4, l: Math.abs(S.vel.l) > 0.4 };
 }
 
-/* ============ Peso na garra (FICTICIO) e carga maxima no raio ============
- * Ainda nao ha celula de carga: o peso e inventado (passeio aleatorio entre 150 e 900 kg, trocando de alvo a cada 4-9 s, com o
- * tremor de uma balanca de verdade) e entregue ao gateway como se viesse do sensor de peso. A carga MAXIMA vem da tabela do
- * fabricante, interpolada no raio atual (a mesma conta do nucleo). So onde o modelo tem tabela (o TITAN 6700, por enquanto). */
-let pesoAlvo = 640, pesoProx = 0, pesoTrem = 0, pesoTremT = 0;
+/* ============ Peso na garra (SIMULADO) e carga maxima no raio ============
+ * Ainda nao ha celula de carga. A "carga" da simulacao e o que a grua SEMPRE leva pendurado: a garra e o rotator (315 kg no TITAN 6700,
+ * dado do fabricante), e o sensor de peso simulado marca isso com a grua vazia. Por cima do valor parado entram duas variacoes REAIS:
+ *   - aceleracao VERTICAL da ponta: subindo e acelerando a carga "pesa" mais, descendo pesa menos (leitura = m (g + a) / g);
+ *   - PENDULO ao girar: a garra balanca como um pendulo de 1,4 m cujo ponto de apoio (a ponta, a raio de 6-7 m) acelera de lado; a tensao
+ *     do cabo varia com o angulo e com a velocidade do balanco (T = m [(g+az) cos(th) - A sin(th) + L th'^2]) e o balanco amortece sozinho.
+ * Mais o tremor de uma balanca. Entra no gateway pelo mesmo campo do sensor de peso real. O MAXIMO mostrado e o da tabela PUBLICADA do
+ * fabricante (sem garra e sem rotator), interpolado no raio atual (a mesma conta do nucleo); so onde o modelo tem tabela. */
+const GRAV = 9.81, CABO = 1.4, PEND_W0 = Math.sqrt(GRAV / CABO), PEND_Z = 0.12, PEND_K = 0.5, AZ_K = 0.5;
+const dinam = { hAnt: null, vz: 0, az: 0, omega: 0, at: 0, th: 0, thv: 0, trem: 0, tremT: 0 };
 function atualizaPeso(dt) {
   const ex = EXTRAS[S.modelo];
-  if (!(ex && ex.carga)) { S.peso = null; return; }
+  if (!(ex && ex.carga)) { S.peso = null; dinam.hAnt = null; return; }
+  const m = ex.tara || 315;
+  dt = Math.max(dt, 1e-3);
+  const hT = alturas().hT, k = Math.min(1, dt / 0.15);                      // k: filtro passa-baixa de 0,15 s (tira o serrilhado do passo)
+  if (dinam.hAnt === null) dinam.hAnt = hT;
+  let vz = (hT - dinam.hAnt) / dt; dinam.hAnt = hT;
+  if (Math.abs(vz) > 4) { vz = dinam.vz; }                                 // salto de pose (Zerar, Estacionar, trocar de modelo) nao e movimento: ignora
+  dinam.az += (Math.max(-6, Math.min(6, (vz - dinam.vz) / dt)) - dinam.az) * k; dinam.vz = vz;       // aceleracao vertical da ponta, m/s2
+  const [, l1, l2] = MODELOS[S.modelo], raio = l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2));
+  const omega = -rad(S.vel.g);                                             // rad/s
+  dinam.at += (Math.max(-12, Math.min(12, raio * (omega - dinam.omega) / dt)) - dinam.at) * k; dinam.omega = omega;   // aceleracao lateral da ponta, m/s2
+  // PEND_K e AZ_K: a grua de verdade acelera mais suave que o modelo do simulador (constante de tempo de 0,25 s), entao as duas
+  // aceleracoes entram reduzidas. A = aceleracao lateral do apoio do pendulo; ge = gravidade efetiva na vertical.
+  const A = PEND_K * dinam.at, ge = GRAV + AZ_K * dinam.az;
+  const alfa = (-ge * Math.sin(dinam.th) - A * Math.cos(dinam.th)) / CABO - 2 * PEND_Z * PEND_W0 * dinam.thv;
+  dinam.thv += alfa * dt; dinam.th = Math.max(-0.6, Math.min(0.6, dinam.th + dinam.thv * dt));
+  const T = ge * Math.cos(dinam.th) - A * Math.sin(dinam.th) + CABO * dinam.thv * dinam.thv;   // tensao do cabo por kg
   const agora = performance.now() / 1000;
-  if (S.peso === null) S.peso = pesoAlvo;
-  if (agora >= pesoProx) { pesoAlvo = 150 + Math.random() * 750; pesoProx = agora + 4 + Math.random() * 5; }
-  S.peso += (pesoAlvo - S.peso) * Math.min(1, dt * 0.6);
-  if (agora >= pesoTremT) { pesoTrem = (Math.random() - 0.5) * 12; pesoTremT = agora + 0.4; }
-  S.pesoLido = Math.max(0, Math.round((S.peso + pesoTrem) / 5) * 5);
+  if (agora >= dinam.tremT) { dinam.trem = (Math.random() - 0.5) * 3; dinam.tremT = agora + 0.4; }
+  S.peso = m * T / GRAV;
+  S.pesoLido = Math.max(0, Math.round(S.peso + dinam.trem));
 }
 const pesoKg = () => S.peso === null ? null : S.pesoLido;
 function cargaMaxKg() {
   const ex = EXTRAS[S.modelo]; if (!ex || !ex.carga) return null;
   const [, l1, l2] = MODELOS[S.modelo], c = ex.carga, r = (l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2))) * 1000;
   if (r > c[c.length - 1][0]) return null;                           // alem da tabela
-  let kg;
-  if (r <= c[0][0]) kg = c[0][1];                                    // abaixo da primeira linha: vale a primeira (conservador)
-  else { let i = 1; while (c[i][0] < r) i++; kg = c[i - 1][1] + (c[i][1] - c[i - 1][1]) * (r - c[i - 1][0]) / (c[i][0] - c[i - 1][0]); }
-  return Math.max(0, kg - (ex.tara || 0));                           // carga UTIL: a tabela vale sem garra e sem rotator
+  if (r <= c[0][0]) return c[0][1];                                  // abaixo da primeira linha: vale a primeira (conservador)
+  let i = 1; while (c[i][0] < r) i++;
+  return c[i - 1][1] + (c[i][1] - c[i - 1][1]) * (r - c[i - 1][0]) / (c[i][0] - c[i - 1][0]);   // a tabela PUBLICADA, sem desconto
 }
 const milhar = n => Math.round(n).toLocaleString('pt-BR');
 
@@ -1079,7 +1097,7 @@ function desenha() {
 function etiquetaPeso(P2) {
   const pk = pesoKg(); if (pk === null) return '';
   const cm = cargaMaxKg(), kz = Math.min(1, Math.max(0.2, P2[2] / 1.40));          // kz: a garra se comprime perto do chao (ver constroi)
-  const g = proj([P2[0], P2[1], P2[2] - 0.8 * kz]), r = cm === null ? 0 : pk / cm;
+  const g = proj([P2[0], P2[1], P2[2] - 0.8 * kz]), tara = (EXTRAS[S.modelo] || {}).tara || 0, r = cm === null ? 0 : Math.max(0, pk - tara) / cm;   // a cor usa a carga LIQUIDA: a tabela vale sem garra e rotator
   const cor = cm === null ? '#E8EBDF' : r > 1 ? '#FF4A3A' : r >= 0.85 ? '#D9AE58' : '#82BC85';
   const x = (g[0] + 56) | 0, y = g[1] | 0, estilo = 'font-family="monospace" font-weight="700" stroke="#14160F" stroke-width="5" paint-order="stroke"';
   return `<line x1="${(g[0] + 12) | 0}" y1="${y}" x2="${x - 6}" y2="${y}" stroke="${cor}" stroke-width="1.6"/>` +
@@ -1102,8 +1120,8 @@ function painel() {
   const ex = EXTRAS[S.modelo];
   if (ex && ex.carga) {                                      // alcance horizontal da ponta e capacidade da tabela do fabricante (interpolada)
     const [, l1, l2] = MODELOS[S.modelo], c = ex.carga, r = (l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2))) * 1000;
-    const util = cargaMaxKg(), tara = ex.tara || 0;
-    const kg = util === null ? 'fora da tabela' : (r < c[0][0] ? '≥ ' : '') + milhar(util) + ' kg úteis';
+    const mx = cargaMaxKg();
+    const kg = mx === null ? 'fora da tabela' : (r < c[0][0] ? '≥ ' : '') + milhar(mx) + ' kg';
     $('vCap').textContent = fmt(r / 1000, 1) + ' m · ' + kg;
   }
   const st = $('status');
