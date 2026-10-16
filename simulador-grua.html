@@ -47,6 +47,10 @@ button.on { background: var(--accent); color: #1A1200; border-color: var(--accen
 #ctl { position: absolute; top: 96px; left: 12px; width: 232px; background: rgba(29,32,24,.88); border: 1px solid var(--line);
   border-radius: 10px; padding: 10px; backdrop-filter: blur(4px); }
 #ctl:empty { display: none; }
+.girh { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; letter-spacing: .08em; color: var(--ink-soft);
+  margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.girh b { color: var(--ink); font-weight: 600; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+@media (max-height: 800px) { #ctl #log { display: none; } }          /* o log cede lugar aos limites de giro em telas baixas */
 #ctl .cfg { margin-top: 0; }
 #status { text-align: center; font-weight: 800; font-size: 26px; letter-spacing: .08em; padding: 12px 6px;
   border-radius: 8px; background: #23422A; color: var(--good); transition: background .15s; }
@@ -197,7 +201,8 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <div class="lin"><span>Altura do cotovelo</span><b id="vHE">0 m</b></div>
   <div class="lin"><span>Altura da ponta</span><b id="vHT">0 m</b></div>
   <div class="lin"><span>Pressão (simulada)</span><b id="vP">0 bar</b></div>
-  <div class="lin" id="linCap" style="display:none"><span>Alcance · capacidade</span><b id="vCap">—</b></div>
+  <div class="lin" id="linPeso" style="display:none"><span>Peso / máx.</span><b id="vPeso">—</b></div>
+  <div class="lin" id="linCap" style="display:none"><span>Alcance · carga útil</span><b id="vCap">—</b></div>
   <div class="lin"><span>Gateway 101</span><b id="vBle">desligada</b></div>
   <div class="cfg">
     <label>Modelo
@@ -212,6 +217,13 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
     <label>&nbsp;<button id="bZera">Zerar grua</button></label>
     <button id="bPark" style="grid-column:1/-1">⤓ ESTACIONAR (dobrar lança)</button>
     <button id="ensinar">ENSINAR LIMITE nesta posição</button>
+    <div class="girh" style="grid-column:1/-1"><span>LIMITES DE GIRO</span><b id="vGlim">sem limite</b></div>
+    <button id="gGravN" title="Grava o giro de AGORA como limite do lado negativo (horário)">GRAVAR − aqui</button>
+    <button id="gGravP" title="Grava o giro de AGORA como limite do lado positivo (anti-horário)">GRAVAR + aqui</button>
+    <label>Aviso (graus)
+      <select id="gPreSel"><option value="0">sem aviso</option><option value="5">5°</option><option value="10" selected>10°</option><option value="15">15°</option><option value="20">20°</option></select>
+    </label>
+    <label>&nbsp;<button id="gLimpa">Apagar limites</button></label>
   </div>
   <div id="log"></div>
 </aside>
@@ -249,7 +261,8 @@ const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390]
 // Dados por modelo além das medidas: rótulo, curso total do giro (graus) e tabela de capacidade [alcance mm, kg] do fabricante.
 // A ORDEM de MODELOS importa: o índice na tabela do núcleo do gateway é a posição aqui (modelo novo sempre no fim).
 // Produto AINDA NÃO lançado não entra aqui: vai num modelos-extras.json servido só pelo gateway local (ver o carregador no fim do script).
-const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
+// carga = tabela do fabricante [alcance mm, kg] SEM garra e SEM rotator; tara = o peso dos dois (315 kg no Titan), que sai da carga util.
+const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, tara: 315, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
 const HIST = 0.05;
 // Giro do 8800LI: 420° de curso, simétrico em volta do zero (±210°), com batente nas duas pontas.
 // O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido no sentido anti-horário visto de cima:
@@ -261,6 +274,7 @@ const T1 = [0, 80], T2 = [0, 180];           // lança: 0° = esticada, colinear
 
 const P_REP = 60, P_SOBE = 210, P_DESCE = 150;   // pressão do circuito (bar): descanso 60; levantando braço/lança 210; baixando (ou só girando) 150
 const S = { garra: 1, rot: 0, modelo: 'TITAN6700', giro: 0, t1: 0, t2: 10, limite: 5.8, pre: 0.5,
+            peso: null, gNeg: null, gPos: null, gPre: 10, gEst: 0, gLado: 0,       // peso FICTICIO na garra (kg) e limites de giro programaveis (graus, null = sem limite)
             alarme: false, pregao: false, pressao: 60, vel: { g: 0, b: 0, l: 0 }, blq: { g: false, b: false, l: false } };
 const rad = d => d * Math.PI / 180;
 const fmt = (v, n = 2) => v.toFixed(n).replace('.', ',');
@@ -423,6 +437,7 @@ function passa(dt) {
     S.rot += (inp.r || 0) * 120 * dt;      // (o ESTACIONAR devolve so g, b, l: sem o "|| 0" o rotator e a garra viravam NaN e sumiam)
     S.garra = Math.max(0, Math.min(1, S.garra + (inp.a || 0) * 0.6 * dt));
   }
+  atualizaPeso(dt);
   const alvo = { g: inp.g * VEL.g, b: inp.b * VEL.b, l: inp.l * VEL.l };   // °/s desejados
   const a = Math.min(1, dt / 0.25);
   const cur = maxH(S.t1, S.t2);
@@ -437,12 +452,15 @@ function passa(dt) {
   if (S.blq.b) S.vel.b = 0;
   if (S.blq.l) S.vel.l = 0;
 
+  // limite de giro programado: passou dele, o giro nao segue para FORA (voltar e livre). Avaliado no passo anterior.
+  S.blq.g = false;
+  if (S.gEst === 2 && ((S.gLado > 0 && S.vel.g < 0) || (S.gLado < 0 && S.vel.g > 0))) { S.vel.g = 0; S.blq.g = true; }
   // giro com batente: direita = horário visto de cima; nas pontas do curso de 420° a grua para
   const ng = S.giro - S.vel.g * dt;
   const noBatente = (ng <= GIRO_LIM[0] && ng < S.giro) || (ng >= GIRO_LIM[1] && ng > S.giro);
   S.giro = Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], ng));
   if (noBatente) S.vel.g = 0;      // o batente do modelo segura o giro em silêncio: sem log, sem marca de bloqueio
-  S.blq.g = false;
+  avaliaGiro();
   S.t1 = Math.max(T1[0], Math.min(T1[1], S.t1 + S.vel.b * dt));
   S.t2 = Math.max(T2[0], Math.min(T2[1], S.t2 - S.vel.l * dt));
 
@@ -462,6 +480,80 @@ function passa(dt) {
   S.movendo = { g: Math.abs(S.vel.g) > 0.8, b: Math.abs(S.vel.b) > 0.4, l: Math.abs(S.vel.l) > 0.4 };
 }
 
+/* ============ Peso na garra (FICTICIO) e carga maxima no raio ============
+ * Ainda nao ha celula de carga: o peso e inventado (passeio aleatorio entre 150 e 900 kg, trocando de alvo a cada 4-9 s, com o
+ * tremor de uma balanca de verdade) e entregue ao gateway como se viesse do sensor de peso. A carga MAXIMA vem da tabela do
+ * fabricante, interpolada no raio atual (a mesma conta do nucleo). So onde o modelo tem tabela (o TITAN 6700, por enquanto). */
+let pesoAlvo = 640, pesoProx = 0, pesoTrem = 0, pesoTremT = 0;
+function atualizaPeso(dt) {
+  const ex = EXTRAS[S.modelo];
+  if (!(ex && ex.carga)) { S.peso = null; return; }
+  const agora = performance.now() / 1000;
+  if (S.peso === null) S.peso = pesoAlvo;
+  if (agora >= pesoProx) { pesoAlvo = 150 + Math.random() * 750; pesoProx = agora + 4 + Math.random() * 5; }
+  S.peso += (pesoAlvo - S.peso) * Math.min(1, dt * 0.6);
+  if (agora >= pesoTremT) { pesoTrem = (Math.random() - 0.5) * 12; pesoTremT = agora + 0.4; }
+  S.pesoLido = Math.max(0, Math.round((S.peso + pesoTrem) / 5) * 5);
+}
+const pesoKg = () => S.peso === null ? null : S.pesoLido;
+function cargaMaxKg() {
+  const ex = EXTRAS[S.modelo]; if (!ex || !ex.carga) return null;
+  const [, l1, l2] = MODELOS[S.modelo], c = ex.carga, r = (l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2))) * 1000;
+  if (r > c[c.length - 1][0]) return null;                           // alem da tabela
+  let kg;
+  if (r <= c[0][0]) kg = c[0][1];                                    // abaixo da primeira linha: vale a primeira (conservador)
+  else { let i = 1; while (c[i][0] < r) i++; kg = c[i - 1][1] + (c[i][1] - c[i - 1][1]) * (r - c[i - 1][0]) / (c[i][0] - c[i - 1][0]); }
+  return Math.max(0, kg - (ex.tara || 0));                           // carga UTIL: a tabela vale sem garra e sem rotator
+}
+const milhar = n => Math.round(n).toLocaleString('pt-BR');
+
+/* ============ Limites de giro programaveis ============
+ * Um limite para cada lado (graus COM SINAL em torno do zero; negativo = horario, positivo = anti-horario). Perto dele o buzzer
+ * avisa; passando, o giro TRAVA para fora (o rele K2 "trava giro" do gateway) mas voltar e livre. Mesma regra do nucleo
+ * (hfort_nucleo.h): histerese de 1 grau, janela minima de 10 graus entre os dois, aviso que nao cabe na janela desliga. */
+const GIRO_HIST = 1.0, GIRO_JANELA_MIN = 10;
+function giroConfPre() {
+  const m = GIRO_LIM[1], lo = S.gNeg === null ? -m : S.gNeg, hi = S.gPos === null ? m : S.gPos;
+  if (S.gPre > 0 && (S.gNeg === null && S.gPos === null || hi - lo < 2 * S.gPre + 2)) {
+    S.gPre = 0; $('gPreSel').value = '0'; log('Aviso de giro desligado: não cabe entre os limites');
+  }
+}
+function avaliaGiro() {
+  const ant = S.gEst;
+  let est = 0, lado = 0, perto = Infinity;
+  if (S.gNeg !== null || S.gPos !== null) {
+    const dN = S.gNeg === null ? Infinity : S.giro - S.gNeg, dP = S.gPos === null ? Infinity : S.gPos - S.giro;
+    perto = Math.min(dN, dP); lado = dN < dP ? -1 : 1;
+    if (perto < 0 || (ant === 2 && perto < GIRO_HIST)) est = 2;
+    else if (S.gPre > 0 && (perto <= S.gPre || (ant === 1 && perto <= S.gPre + GIRO_HIST))) est = 1;
+  }
+  if (est !== ant) {
+    const nome = lado < 0 ? '−' : '+', lim = lado < 0 ? S.gNeg : S.gPos;
+    if (est === 2) log(`LIMITE DE GIRO ${nome} (${fmt(lim, 1)}°) — giro travado para fora`);
+    else if (est === 1) log(`Aviso de giro: perto do limite ${nome} (${fmt(lim, 1)}°)`);
+    else if (ant === 2) log('Limite de giro liberado');
+  }
+  S.gEst = est; S.gLado = est ? lado : 0; S.gPerto = perto;
+}
+function giroGravar(lado) {
+  const a = Math.round(S.giro * 10) / 10;
+  const neg = lado < 0 ? a : S.gNeg, pos = lado < 0 ? S.gPos : a;
+  if (neg !== null && pos !== null && pos - neg < GIRO_JANELA_MIN) { log(`Recusado: os limites de giro precisam ficar a ${GIRO_JANELA_MIN}° um do outro`); return; }
+  if (lado < 0) S.gNeg = a; else S.gPos = a;
+  log(`LIMITE DE GIRO ${lado < 0 ? '−' : '+'} gravado em ${fmt(a, 1)}°`);
+  giroConfPre(); avaliaGiro(); atualizaGiroUI();
+}
+function atualizaGiroUI() {
+  const v = x => x === null ? '—' : fmt(x, 0) + '°';
+  $('vGlim').textContent = S.gNeg === null && S.gPos === null ? 'sem limite' : '− ' + v(S.gNeg) + ' · + ' + v(S.gPos);
+}
+function ligaGiroUI() {
+  $('gGravN').onclick = () => giroGravar(-1);
+  $('gGravP').onclick = () => giroGravar(1);
+  $('gPreSel').onchange = e => { S.gPre = +e.target.value; giroConfPre(); avaliaGiro(); log(S.gPre > 0 ? `Aviso de giro: ${S.gPre}° antes do limite` : 'Aviso de giro desligado'); };
+  $('gLimpa').onclick = () => { S.gNeg = S.gPos = null; S.gEst = 0; S.gLado = 0; atualizaGiroUI(); log('Limites de giro apagados'); };
+}
+
 /* ============ Som ============ */
 let ctx = null, mudo = false, proxBip = 0;
 function audioLiga() { if (!ctx) try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} if (ctx && ctx.state === 'suspended') ctx.resume(); }
@@ -474,9 +566,12 @@ function bip(freq, dur) {
 }
 function buzzer(agora) {
   if (agora < proxBip) return;
-  if (S.alarme) { bip(1800, 0.1); proxBip = agora + 0.2; }
+  if (S.alarme || S.gEst === 2) { bip(1800, 0.1); proxBip = agora + 0.2; }
   else if (S.pregao) {
     const h = maxH(S.t1, S.t2), f = Math.max(0, Math.min(1, (h - (S.limite - S.pre)) / S.pre));
+    bip(1200, 0.08); proxBip = agora + 0.9 - 0.6 * f;
+  } else if (S.gEst === 1) {
+    const f = Math.max(0, Math.min(1, 1 - S.gPerto / S.gPre));        // mais perto do limite de giro, mais rapido
     bip(1200, 0.08); proxBip = agora + 0.9 - 0.6 * f;
   }
 }
@@ -872,6 +967,28 @@ function transferidor(c, e1, e2, r, a0, a1, cur, lim, rot, passoRot, ref = 0, om
   return o;
 }
 
+/* Os limites de giro no CHAO: o setor proibido (alem do limite, em vermelho) e a faixa de aviso (ambar) em volta da grua, mais o
+ * nome do limite. Aparecem mesmo com os transferidores desligados: e o que mostra, de cima, ate onde o giro pode ir. */
+function setoresGiro() {
+  if (S.gNeg === null && S.gPos === null) return { f: '', t: '' };
+  const zr = rad(GIRO_ZERO), X = [Math.cos(zr), Math.sin(zr), 0], Yv = [-Math.sin(zr), Math.cos(zr), 0], O = [0, 0, 0.03];
+  const R = 4.4, travado = S.gEst === 2, AMB = '#D9AE58';
+  const setor = (a0, a1, cor, op) => a1 - a0 < 0.5 ? '' : `<polygon points="${P2s(O)} ${poli(O, X, Yv, R, a0, a1, 3)}" fill="${cor}" fill-opacity="${op}" stroke="none"/>`;
+  let f = '', t = '';
+  const [lo, hi] = GIRO_LIM, pre = S.gPre;
+  const lado = (a, fim, sinal) => {                                    // sinal: -1 = lado negativo, +1 = positivo
+    const cor = travado && S.gLado === sinal ? '#FF4A3A' : VM;
+    f += sinal < 0 ? setor(fim, a, VM, travado && S.gLado < 0 ? .38 : .20) : setor(a, fim, VM, travado && S.gLado > 0 ? .38 : .20);
+    if (pre > 0) f += sinal < 0 ? setor(a, Math.min(a + pre, S.gPos === null ? hi : S.gPos), AMB, .22)
+                                : setor(Math.max(a - pre, S.gNeg === null ? lo : S.gNeg), a, AMB, .22);
+    f += lin3(O, arc3(O, X, Yv, R + 0.4, a), cor, 3, .95);
+    t += txt(arc3(O, X, Yv, R + 1.0, a), `LIMITE ${a < 0 ? '−' : '+'}${fmt(Math.abs(a), 0)}°`, { cor, op: 1, fs: 15, dy: 5 });
+  };
+  if (S.gNeg !== null) lado(S.gNeg, lo, -1);
+  if (S.gPos !== null) lado(S.gPos, hi, 1);
+  return { f, t };
+}
+
 function desenhaTransf(P0, P1) {
   if (!mostraTransf) { gTrChao.innerHTML = gTrAr.innerHTML = ''; return; }
   const psi = rad(S.giro + GIRO_ZERO), t1 = rad(S.t1);
@@ -917,7 +1034,8 @@ function desenha() {
     s += `<line x1="${a[0]|0}" y1="${a[1]|0}" x2="${b[0]|0}" y2="${b[1]|0}" stroke="#8FB2BC" stroke-opacity="${op}"/>`;
     s += `<line x1="${c[0]|0}" y1="${c[1]|0}" x2="${d[0]|0}" y2="${d[1]|0}" stroke="#8FB2BC" stroke-opacity="${op}"/>`;
   }
-  gChao.innerHTML = s;
+  const sg = setoresGiro();
+  gChao.innerHTML = s + sg.f;
 
   // sombra do braço e da lança no chão (dá a noção de altura)
   const q0 = proj([0, 0, 0]), q1 = proj([P1[0], P1[1], 0]), q2 = proj([P2[0], P2[1], 0]);
@@ -942,7 +1060,7 @@ function desenha() {
   const lb = proj([-8, -8, S.limite]);
   const lbx = Math.max(VB.x + 8, Math.min(lb[0], VB.x + VB.w - 170));     // no celular a quina do plano fica fora da tela: o rotulo acompanha a vista
   t += `<text x="${lbx|0}" y="${(lb[1] - 8)|0}" fill="${cor}" font-size="22" font-weight="700" font-family="monospace">LIMITE ${fmt(S.limite)} m</text>`;
-  gTeto.innerHTML = t;
+  gTeto.innerHTML = t + sg.t;
 
   // prumo da ponta com a altura
   const a = proj(P2), b = proj([P2[0], P2[1], 0]);
@@ -950,7 +1068,21 @@ function desenha() {
   gRot.innerHTML =
     `<line x1="${a[0]|0}" y1="${a[1]|0}" x2="${b[0]|0}" y2="${b[1]|0}" stroke="${cor}" stroke-width="2" stroke-dasharray="6 6"/>` +
     `<circle cx="${b[0]|0}" cy="${b[1]|0}" r="6" fill="none" stroke="${cor}" stroke-width="2"/>` +
-    `<text x="${(a[0] + 14)|0}" y="${(a[1] - 12)|0}" fill="#E8EBDF" font-size="26" font-weight="700" font-family="monospace" stroke="#14160F" stroke-width="5" paint-order="stroke">${fmt(hT)} m</text>`;
+    `<text x="${(a[0] + 14)|0}" y="${(a[1] - 12)|0}" fill="#E8EBDF" font-size="26" font-weight="700" font-family="monospace" stroke="#14160F" stroke-width="5" paint-order="stroke">${fmt(hT)} m</text>` +
+    etiquetaPeso(P2);
+}
+
+/* O peso FICA NO AR, junto da garra (acompanha a pose e o zoom): o peso na garra e, embaixo, a carga maxima para o raio de agora.
+ * Verde ate 85% do maximo, ambar ate o maximo, vermelho passando. So onde o modelo tem tabela de carga. */
+function etiquetaPeso(P2) {
+  const pk = pesoKg(); if (pk === null) return '';
+  const cm = cargaMaxKg(), kz = Math.min(1, Math.max(0.2, P2[2] / 1.40));          // kz: a garra se comprime perto do chao (ver constroi)
+  const g = proj([P2[0], P2[1], P2[2] - 0.8 * kz]), r = cm === null ? 0 : pk / cm;
+  const cor = cm === null ? '#E8EBDF' : r > 1 ? '#FF4A3A' : r >= 0.85 ? '#D9AE58' : '#82BC85';
+  const x = (g[0] + 56) | 0, y = g[1] | 0, estilo = 'font-family="monospace" font-weight="700" stroke="#14160F" stroke-width="5" paint-order="stroke"';
+  return `<line x1="${(g[0] + 12) | 0}" y1="${y}" x2="${x - 6}" y2="${y}" stroke="${cor}" stroke-width="1.6"/>` +
+         `<text x="${x}" y="${y - 2}" fill="${cor}" font-size="26" ${estilo}>${milhar(pk)} kg</text>` +
+         `<text x="${x}" y="${y + 19}" fill="#E8EBDF" font-size="17" ${estilo}>${cm === null ? 'fora da tabela' : 'máx ' + milhar(cm) + ' kg'}</text>`;
 }
 
 /* ============ Painel ============ */
@@ -968,15 +1100,18 @@ function painel() {
   const ex = EXTRAS[S.modelo];
   if (ex && ex.carga) {                                      // alcance horizontal da ponta e capacidade da tabela do fabricante (interpolada)
     const [, l1, l2] = MODELOS[S.modelo], c = ex.carga, r = (l1 * Math.cos(rad(S.t1)) + l2 * Math.cos(rad(S.t1 - S.t2))) * 1000;
-    let kg;
-    if (r < c[0][0]) kg = '≥ ' + c[0][1].toLocaleString('pt-BR') + ' kg';
-    else if (r > c[c.length - 1][0]) kg = 'fora da tabela';
-    else { let i = 1; while (c[i][0] < r) i++; kg = Math.round(c[i - 1][1] + (c[i][1] - c[i - 1][1]) * (r - c[i - 1][0]) / (c[i][0] - c[i - 1][0])).toLocaleString('pt-BR') + ' kg'; }
+    const util = cargaMaxKg(), tara = ex.tara || 0;
+    const kg = util === null ? 'fora da tabela' : (r < c[0][0] ? '≥ ' : '') + milhar(util) + ' kg úteis';
     $('vCap').textContent = fmt(r / 1000, 1) + ' m · ' + kg;
   }
   const st = $('status');
-  st.className = S.alarme ? 'alarme' : S.pregao ? 'pre' : '';
-  st.textContent = S.alarme ? 'ALARME — LIMITE' : S.pregao ? 'PRÉ-AVISO' : 'LIVRE';
+  const gT = S.gEst === 2, gA = S.gEst === 1, sg = S.gLado < 0 ? '−' : '+';
+  st.className = (S.alarme || gT) ? 'alarme' : (S.pregao || gA) ? 'pre' : '';
+  st.textContent = S.alarme ? 'ALARME — LIMITE' : gT ? 'ALARME — GIRO ' + sg : S.pregao ? 'PRÉ-AVISO' : gA ? 'PRÉ-AVISO — GIRO ' + sg : 'LIVRE';
+  st.style.fontSize = st.textContent.length > 14 ? '17px' : '';          // textos longos (limite de giro) cabem numa linha so
+  const pk = pesoKg(), cm = cargaMaxKg();
+  $('linPeso').style.display = pk === null ? 'none' : '';
+  if (pk !== null) $('vPeso').textContent = cm === null ? milhar(pk) + ' kg / fora da tabela' : milhar(pk) + ' / ' + milhar(cm) + ' kg · ' + Math.round(pk / cm * 100) + '%';
   for (const [id, e] of [['eG', 'g'], ['eB', 'b'], ['eL', 'l']]) {
     const el = $(id), nome = { g: 'GIRO', b: 'BRAÇO', l: 'LANÇA' }[e];
     el.className = 'eixo' + (S.blq[e] ? ' blq' : S.movendo && S.movendo[e] ? ' mov' : '');
@@ -1013,7 +1148,8 @@ async function bleEnvia() {
   if (!ble) return;
   if (NATIVO) {      // o app roda o MESMO núcleo do gateway; o quadro vai direto, sem rede
     try {
-      AndroidSim.quadro(giroSaida(), S.t1, S.t2, S.pressao, Object.keys(MODELOS).indexOf(S.modelo), S.limite, S.pre);
+      AndroidSim.quadro(giroSaida(), S.t1, S.t2, S.pressao, Object.keys(MODELOS).indexOf(S.modelo), S.limite, S.pre,
+                        pesoKg() === null ? -1 : pesoKg(), S.gNeg === null ? NaN : S.gNeg, S.gPos === null ? NaN : S.gPos, S.gPre);
       bleEstado('no ar (dash do app)', 'ok');
     } catch (e) { bleEstado('ponte do app falhou', 'erro'); }
     if (ble) bleTimer = setTimeout(bleEnvia, 100);
@@ -1023,7 +1159,8 @@ async function bleEnvia() {
   try {
     const r = await fetch(PONTE + '/sim', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, signal: ctl.signal,
       body: JSON.stringify({ giro: giroSaida(), t1: S.t1, t2: S.t2, pressao: S.pressao,
-                             modelo: Object.keys(MODELOS).indexOf(S.modelo), limite: S.limite, pre: S.pre }) });
+                             modelo: Object.keys(MODELOS).indexOf(S.modelo), limite: S.limite, pre: S.pre,
+                             peso: pesoKg(), gneg: S.gNeg, gpos: S.gPos, gpre: S.gPre }) });
     const j = await r.json(); bleErros = 0;
     bleEstado(j.vivo ? 'no ar (GATEWAY-' + j.serie + ')' : 'ligando…', j.vivo ? 'ok' : '');
   } catch (e) { bleErros++; bleEstado(PONTE === location.origin ? 'gateway parou — rode: sim-gateway' : 'sem gateway — rode: sim-gateway --abrir', 'erro'); }
@@ -1036,6 +1173,7 @@ $('bBle').onclick = () => {
   else { bleEstado('desligada', ''); $('bBle').classList.remove('on'); log('Saída para o gateway 101 desligada'); }
 };
 $('bPainel').onclick = () => $('painel').classList.toggle('aberto');
+ligaGiroUI();
 $('bTransf').onclick = () => { mostraTransf = !mostraTransf; $('bTransf').classList.toggle('on', mostraTransf); };
 $('bDemo').onclick = alternaDemo;
 $('bPark').onclick = () => { if (demo) alternaDemo(); estaciona = true; faseDobra = false; log('Estacionando…'); audioLiga(); };
@@ -1056,6 +1194,9 @@ function aplicaModelo() {
   limPadrao = novoLim;
   const ex = EXTRAS[S.modelo], total = (ex && ex.giro) || 420;
   GIRO_LIM = [-total / 2, total / 2];
+  if (S.gNeg !== null && Math.abs(S.gNeg) > total / 2) S.gNeg = null;          // limite fora do curso do novo modelo
+  if (S.gPos !== null && Math.abs(S.gPos) > total / 2) S.gPos = null;
+  atualizaGiroUI();
   S.giro = Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], S.giro));
   $('lG').textContent = 'Giro (curso ' + GIRO_LIM[0] + '…+' + GIRO_LIM[1] + ')';
   $('linCap').style.display = ex && ex.carga ? '' : 'none';
