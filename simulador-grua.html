@@ -219,8 +219,8 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
     <button id="bPark" style="grid-column:1/-1">⤓ ESTACIONAR (dobrar lança)</button>
     <button id="ensinar">ENSINAR LIMITE nesta posição</button>
     <div class="girh" style="grid-column:1/-1"><span>LIMITES DE GIRO</span><b id="vGlim">sem limite</b></div>
-    <button id="gGravN" title="Grava o giro de AGORA como limite do lado negativo (horário)">GRAVAR − aqui</button>
-    <button id="gGravP" title="Grava o giro de AGORA como limite do lado positivo (anti-horário)">GRAVAR + aqui</button>
+    <button id="gGravN" title="Grava o giro de AGORA como limite do lado negativo (anti-horário)">GRAVAR − aqui</button>
+    <button id="gGravP" title="Grava o giro de AGORA como limite do lado positivo (horário)">GRAVAR + aqui</button>
     <label>Aviso (graus)
       <select id="gPreSel"><option value="0">sem aviso</option><option value="5">5°</option><option value="10" selected>10°</option><option value="15">15°</option><option value="20">20°</option></select>
     </label>
@@ -268,7 +268,7 @@ const MODELOS = { '5570LI': [1.77, 3.190, 2.080], '7700LI': [1.77, 3.790, 2.390]
 const EXTRAS = { 'TITAN6700': { rotulo: 'TITAN 6700', giro: 300, tara: 315, massa: { col: 450, braco: 630, lanca: 420 }, carga: [[3000, 3040], [4000, 2280], [5000, 1810], [6000, 1490], [7000, 1250]] } };
 const HIST = 0.05;
 // Giro do 8800LI: 420° de curso, simétrico em volta do zero (±210°), com batente nas duas pontas.
-// O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido no sentido anti-horário visto de cima:
+// O ZERO do giro fica a GIRO_ZERO° do eixo do caminhão (+x, rumo à cabine), medido a partir do eixo do caminhão (os graus do giro CRESCEM no sentido horário visto de cima, como o azimute do sensor de giro):
 // o 0° é a lança PERPENDICULAR ao caminhão, e é onde o ESTACIONAR deixa o giro.
 const GIRO_ZERO = 90;
 let GIRO_LIM = [-210, 210];            // muda com o modelo: curso total do giro (420° no 8800LI) dividido em torno do zero
@@ -355,13 +355,13 @@ document.querySelectorAll('#garraCtl button').forEach(b => {
 
 /* Demonstração: dirige a grua sozinha por poses, passando do limite de propósito */
 const ROTEIRO = [
-  { g: -50, t1: 30, t2: 10 }, { g: 5, t1: 62, t2: 2 }, { g: -120, t1: 25, t2: 45 },
-  { g: -170, t1: 55, t2: 3 }, { g: -90, t1: 20, t2: 20 },
+  { g: 50, t1: 30, t2: 10 }, { g: -5, t1: 62, t2: 2 }, { g: 120, t1: 25, t2: 45 },       // (espelhado: o giro agora cresce no sentido horario)
+  { g: 150, t1: 55, t2: 3 }, { g: 90, t1: 20, t2: 20 },
 ];
 let passo = 0, tPasso = 0;
 function entradaDemo(dt) {
   const alvo = ROTEIRO[passo];
-  const dg = -(alvo.g - S.giro);
+  const dg = alvo.g - S.giro;
   const sat = (e, tol) => Math.max(-1, Math.min(1, e / tol));
   const e = { g: sat(dg, 6), b: sat(alvo.t1 - S.t1, 3), l: sat(S.t2 - alvo.t2, 3) };   // lança "sobe" = reduz t2
   tPasso += dt;
@@ -390,7 +390,7 @@ function entradas(dt) {
     // fases: 1) gira até o zero, com braço e lança parados; 2) levanta o braço e dobra a lança AO MESMO TEMPO — o chão
     // freia a dobra enquanto o braço está baixo e o alarme de altura freia a subida enquanto a lança está esticada
     // (dobrar baixa a ponta e libera o alarme); 3) com a lança dobrada, baixa o braço de novo
-    if (Math.abs(dg) > 0.7 && !faseDobra) return { g: -sat(dg, 6), b: 0, l: 0 };
+    if (Math.abs(dg) > 0.7 && !faseDobra) return { g: sat(dg, 6), b: 0, l: 0 };
     if (!faseDobra) { faseDobra = true; parkTrava = 0; log('Giro em zero — dobrando a lança'); }
     const dobrada = Math.abs(S.t2 - A.t2) < 1.5;
     let b, l;
@@ -405,7 +405,7 @@ function entradas(dt) {
     const semProgresso = (b > 0 || l > 0) && (b <= 0 || S.blq.b) && (l <= 0 || S.blq.l);     // os dois eixos travados
     parkTrava = semProgresso ? parkTrava + dt : 0;
     if (parkTrava > 2) { estaciona = false; faseDobra = false; log('Estacionar parou: o limite de altura e o chão travam a manobra'); }
-    return { g: -sat(dg, 6), b, l };      // o giro segue travado em zero
+    return { g: sat(dg, 6), b, l };      // o giro segue travado em zero
   }
   if (demo && manual) alternaDemo();                     // tocou: a demonstração larga o comando
   const r = demo ? entradaDemo(dt) : m;
@@ -457,9 +457,9 @@ function passa(dt) {
 
   // limite de giro programado: passou dele, o giro nao segue para FORA (voltar e livre). Avaliado no passo anterior.
   S.blq.g = false;
-  if (S.gEst === 2 && ((S.gLado > 0 && S.vel.g < 0) || (S.gLado < 0 && S.vel.g > 0))) { S.vel.g = 0; S.blq.g = true; }
-  // giro com batente: direita = horário visto de cima; nas pontas do curso de 420° a grua para
-  const ng = S.giro - S.vel.g * dt;
+  if (S.gEst === 2 && ((S.gLado > 0 && S.vel.g > 0) || (S.gLado < 0 && S.vel.g < 0))) { S.vel.g = 0; S.blq.g = true; }
+  // giro com batente: direita = horário visto de cima = giro AUMENTA (azimute: graus crescem no sentido horário); nas pontas do curso a grua para
+  const ng = S.giro + S.vel.g * dt;
   const noBatente = (ng <= GIRO_LIM[0] && ng < S.giro) || (ng >= GIRO_LIM[1] && ng > S.giro);
   S.giro = Math.max(GIRO_LIM[0], Math.min(GIRO_LIM[1], ng));
   if (noBatente) S.vel.g = 0;      // o batente do modelo segura o giro em silêncio: sem log, sem marca de bloqueio
@@ -530,7 +530,7 @@ function cargaMaxKg() {
 const milhar = n => Math.round(n).toLocaleString('pt-BR');
 
 /* ============ Limites de giro programaveis ============
- * Um limite para cada lado (graus COM SINAL em torno do zero; negativo = horario, positivo = anti-horario). Perto dele o buzzer
+ * Um limite para cada lado (graus COM SINAL em torno do zero; negativo = anti-horario, positivo = horario: o azimute). Perto dele o buzzer
  * avisa; passando, o giro TRAVA para fora (o rele K2 "trava giro" do gateway) mas voltar e livre. Mesma regra do nucleo
  * (hfort_nucleo.h): histerese de 1 grau, janela minima de 10 graus entre os dois, aviso que nao cabe na janela desliga. */
 const GIRO_HIST = 1.0, GIRO_JANELA_MIN = 10;
@@ -778,7 +778,7 @@ function joelho(f, psi, t1, t2d, P0, dB, l1, CZ) {
 function constroi() {
   const [l0, l1, l2] = MODELOS[S.modelo];
   const f = [];
-  const psi = rad(S.giro + GIRO_ZERO), t1 = rad(S.t1), a2 = rad(S.t1 - S.t2);
+  const psi = rad(GIRO_ZERO - S.giro), t1 = rad(S.t1), a2 = rad(S.t1 - S.t2);
   // cores: braco e lanca sao amarelo/laranja; no TITAN 6700 sao tons de VERDE (braco verde medio, lanca verde mais claro, joelho verde escuro)
   const VERDE = S.modelo === 'TITAN6700';
   const AM = VERDE ? [36, 122, 62] : [226, 164, 28], LA = VERDE ? [86, 178, 100] : [222, 128, 30], CZ = [150, 155, 150], PT = [38, 40, 36], CH = [72, 80, 86];
@@ -996,7 +996,7 @@ function transferidor(c, e1, e2, r, a0, a1, cur, lim, rot, passoRot, ref = 0, om
  * nome do limite. Aparecem mesmo com os transferidores desligados: e o que mostra, de cima, ate onde o giro pode ir. */
 function setoresGiro() {
   if (S.gNeg === null && S.gPos === null) return { f: '', t: '' };
-  const zr = rad(GIRO_ZERO), X = [Math.cos(zr), Math.sin(zr), 0], Yv = [-Math.sin(zr), Math.cos(zr), 0], O = [0, 0, 0.03];
+  const zr = rad(GIRO_ZERO), X = [Math.cos(zr), Math.sin(zr), 0], Yv = [Math.sin(zr), -Math.cos(zr), 0], O = [0, 0, 0.03];
   const R = 4.4, travado = S.gEst === 2, AMB = '#D9AE58';
   const setor = (a0, a1, cor, op) => a1 - a0 < 0.5 ? '' : `<polygon points="${P2s(O)} ${poli(O, X, Yv, R, a0, a1, 3)}" fill="${cor}" fill-opacity="${op}" stroke="none"/>`;
   let f = '', t = '';
@@ -1074,7 +1074,7 @@ const fmtN = (n, est) => (est ? '~' : '') + Math.round(Math.abs(n)).toLocaleStri
 function seta2d(P, F, esc, cor, rot) {
   const kN = Math.hypot(F[0], F[1]) / 1000; if (kN < 0.02) return '';
   const len = Math.min(5, Math.max(0.3, kN * esc)), dir = [F[0] / (kN * 1000), F[1] / (kN * 1000)];
-  const psi = rad(S.giro + GIRO_ZERO), w = (x, z) => loc(psi, x, 0, z);
+  const psi = rad(GIRO_ZERO - S.giro), w = (x, z) => loc(psi, x, 0, z);
   const A = proj(w(P[0], P[1])), B = proj(w(P[0] + dir[0] * len, P[1] + dir[1] * len));
   const ax = B[0] - A[0], ay = B[1] - A[1], n = Math.hypot(ax, ay) || 1, ux = ax / n, uy = ay / n, h = 11;
   const pts = `${B[0].toFixed(1)},${B[1].toFixed(1)} ${(B[0] - ux * h - uy * h * .45).toFixed(1)},${(B[1] - uy * h + ux * h * .45).toFixed(1)} ${(B[0] - ux * h + uy * h * .45).toFixed(1)},${(B[1] - uy * h - ux * h * .45).toFixed(1)}`;
@@ -1100,7 +1100,7 @@ function setasForcas() {
     const esc = a.tipo === 'peso' ? 0.28 : 0.03, cor = FCOR[a.tipo];
     o += seta2d(a.p, a.f, esc, cor, `${a.nome} ${fmtN(Math.hypot(a.f[0], a.f[1]), a.est)}`);
   }
-  const psi = rad(S.giro + GIRO_ZERO), er = [Math.cos(psi), Math.sin(psi), 0], nl = [-Math.sin(psi), Math.cos(psi), 0], ez = [0, 0, 1];
+  const psi = rad(GIRO_ZERO - S.giro), er = [Math.cos(psi), Math.sin(psi), 0], nl = [-Math.sin(psi), Math.cos(psi), 0], ez = [0, 0, 1];
   const kNm = v => (Math.abs(v) / 1000).toFixed(1).replace('.', ',');
   // momento de tombamento: arco no plano do braco em volta da base (carga: x = radial, z = altura)
   o += arcoMomento([0, 0, 0.5], er, ez, 1.1, 170, 20, FCOR.mom, `M base ~${kNm(e.Mtomb)} kN·m (carga ${kNm(e.Mcarga)} de 78)`);
@@ -1111,9 +1111,9 @@ function setasForcas() {
 
 function desenhaTransf(P0, P1) {
   if (!mostraTransf) { gTrChao.innerHTML = gTrAr.innerHTML = ''; return; }
-  const psi = rad(S.giro + GIRO_ZERO), t1 = rad(S.t1);
-  const zr = rad(GIRO_ZERO), X = [Math.cos(zr), Math.sin(zr), 0], Yv = [-Math.sin(zr), Math.cos(zr), 0], O = [0, 0, 0.03];   // 0° do anel = zero do giro
-  // giro: anel no chão, 0° no zero do giro, positivo = anti-horário visto de cima; as pontas além de ±180° vão num anel externo
+  const psi = rad(GIRO_ZERO - S.giro), t1 = rad(S.t1);
+  const zr = rad(GIRO_ZERO), X = [Math.cos(zr), Math.sin(zr), 0], Yv = [Math.sin(zr), -Math.cos(zr), 0], O = [0, 0, 0.03];   // 0° do anel = zero do giro
+  // giro: anel no chão, 0° no zero do giro, positivo = HORÁRIO visto de cima (azimute); as pontas além de ±180° vão num anel externo
   const Rg = 5.0;
   let g = transferidor(O, X, Yv, Rg, -180, 180, S.giro, GIRO_LIM, 'GIRO', 30, 0, [180]);
   const extras = [];
