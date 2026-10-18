@@ -96,8 +96,8 @@ button.on { background: var(--accent); color: #1A1200; border-color: var(--accen
 #garraCtl button { width: 84px; height: 50px; font: 600 12px/1 system-ui, sans-serif; letter-spacing: .06em; color: var(--ink);
   background: rgba(29,32,24,.8); border: 2px solid var(--line); border-radius: 10px; touch-action: none; cursor: pointer; }
 #garraCtl button.on { background: var(--accent); color: #14160F; border-color: var(--accent); }
-#legenda { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); max-width: min(900px, 52vw); display: none; text-align: center;
-  font-size: 21px; line-height: 1.3; padding: 9px 18px; background: rgba(20,22,15,.84); border: 1px solid var(--accent); border-radius: 8px; pointer-events: none; }
+#legenda { position: absolute; bottom: 58px; left: 130px; max-width: min(640px, calc(100vw - 700px)); display: none; text-align: left;     /* entre o pad esquerdo e os botões da garra */
+  font-size: 20px; line-height: 1.3; padding: 9px 16px; background: rgba(20,22,15,.84); border: 1px solid var(--accent); border-radius: 8px; pointer-events: none; }
 #legenda.on { display: block; }
 #legenda b { color: var(--accent); letter-spacing: .06em; }
 #teclas { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 14px; color: var(--ink-soft); pointer-events: none; }
@@ -381,8 +381,10 @@ document.querySelectorAll('#garraCtl button').forEach(b => {
  * cima, 3) içar peças de sucata de 1.100 e 1.450 kg e ver o peso na garra contra o máximo da tabela (só onde o modelo tem tabela).
  * Cada passo leva a grua a uma pose (g, t1, t2, garra a, rotator r); o que o limite travar vira "travou" e o passo segue depois de `esp` s.
  * ini()/fim() rodam ao começar/terminar o passo. Tocar nos controles larga a demonstração (alternaDemo restaura limites e câmera). */
-const CAMS = { lat: { az: 0, el: 3, D: 19, alvo: [0.8, 0, 2.2] }, cima: { az: 0, el: 89, D: 20, alvo: [0.5, 0, 0] }, d3: { az: -38, el: 19, D: 17, alvo: [0.8, 0, 2.2] } };
-let camMeta = null, salvo = null, roteiro = [], passo = 0, tPasso = 0, tEsp = 0, errMelhor = 1e9, tMelhor = 0;
+// seg = graus de afastamento da direção do braço: a câmera SEGUE o giro (az = 180° − giro + seg), então a lança nunca fica de costas.
+// lat: de lado (90°), a lança aparece inteira em perfil; d3: de três quartos pela frente (60°); cima: fixa, de cima.
+const CAMS = { lat: { seg: 90, el: 5, D: 19, alvo: [0.8, 0, 2.2] }, cima: { az: 0, el: 89, D: 20, alvo: [0.5, 0, 0] }, d3: { seg: 60, el: 19, D: 17, alvo: [0.8, 0, 2.2] } };
+let demoPip = null, pipAntes = false, camMeta = null, salvo = null, roteiro = [], passo = 0, tPasso = 0, tEsp = 0, errMelhor = 1e9, tMelhor = 0;
 function legenda(txt) { const el = document.getElementById('legenda'); el.innerHTML = txt; el.classList.toggle('on', !!txt); }
 function setLimite(v) { S.limite = v; S.alarme = false; $('inLim').value = v.toFixed(2); }
 function giroLimites(n, p, q) { S.gNeg = n; S.gPos = p; S.gPre = q; S.gEst = 0; S.gLado = 0; $('gPreSel').value = String(q); giroConfPre(); atualizaGiroUI(); avaliaGiro(); }
@@ -545,7 +547,7 @@ function t1Minimo(t2) {
 function passa(dt) {
   const inp = entradas(dt);
   if (demo && camMeta) {                       // a câmera da demonstração anda suave até a vista do ato (arrastar com o dedo ainda funciona)
-    const k = Math.min(1, dt * 1.6), da = Math.atan2(Math.sin(rad(camMeta.az) - cam.az), Math.cos(rad(camMeta.az) - cam.az));
+    const k = Math.min(1, dt * 1.6), azAlvo = camMeta.seg === undefined ? rad(camMeta.az) : Math.PI - rad(S.giro) + rad(camMeta.seg), da = Math.atan2(Math.sin(azAlvo - cam.az), Math.cos(azAlvo - cam.az));
     cam.az += da * k; cam.el += (rad(camMeta.el) - cam.el) * k; cam.D += (camMeta.D - cam.D) * k;
     for (let i = 0; i < 3; i++) cam.alvo[i] += (camMeta.alvo[i] - cam.alvo[i]) * k;
   }
@@ -1438,6 +1440,7 @@ function painel() {
 /* ============ Controles da interface ============ */
 function alternaDemo() {
   demo = !demo; roteiro = []; passo = 0; tPasso = 0;
+  if (demoPip) demoPip(demo);
   if (demo) salvo = { limite: S.limite, pre: S.pre, gNeg: S.gNeg, gPos: S.gPos, gPre: S.gPre }; else restauraDemo();
   $('bDemo').classList.toggle('on', demo);
   $('bDemo').textContent = demo ? '■ Parar demonstração' : '▶ Demonstração';
@@ -1586,24 +1589,37 @@ fetch('modelos-extras.json').then(r => r.ok ? r.json() : null).then(j => {
   const pm = new URLSearchParams(location.search).get('modelo');
   if (pm && MODELOS[pm]) { S.modelo = pm; $('selModelo').value = pm; aplicaModelo(); log('Modelo ' + (EXTRAS[pm] && EXTRAS[pm].rotulo || pm)); }
 });
+// Miniatura do dash (PiP): o que o operador vê na cabine. A web usa dash.html (BroadcastChannel); o app usa a /op dele. A demonstração a abre sozinha.
+const pip = $('pip'), ifr = $('dashPip'), tela = $('pipTela');
+const ajustaPip = () => {
+  // Telas largas: a miniatura ENCAIXA na coluna da direita, entre o card de status e o pad do braço, na largura do card (ou menor, se a altura livre não der).
+  // Celular: ~56% da largura, no alto. O dash de 1024x600 é escalado por CSS.
+  const larga = innerWidth >= 761, pr = $('painel').getBoundingClientRect(), pd = $('padR').getBoundingClientRect();
+  const topo = larga ? pr.bottom + 8 : 100, livre = pd.top - 6 - topo - 24;
+  const W = larga ? Math.round(Math.max(150, Math.min(pr.width, livre * 1024 / 600))) : Math.round(innerWidth * 0.56), k = W / 1024;
+  tela.style.width = W + 'px'; tela.style.height = Math.round(600 * k) + 'px';
+  ifr.style.transform = `scale(${k})`;
+  const r = pip.getBoundingClientRect();
+  if (!pip.dataset.moveu) { pip.style.left = (larga ? pr.right - W : Math.max(8, innerWidth - W - 8)) + 'px'; pip.style.top = topo + 'px'; }
+  else { pip.style.left = Math.min(r.left, innerWidth - W - 4) + 'px'; }
+};
+setInterval(() => { if (document.body.classList.contains('pipOn')) ajustaPip(); }, 1000);     // o card de status muda de altura (linhas de peso): a miniatura acompanha
+let pipSrc = null;                  // null = sem miniatura nesta versão (quiosque web com ?gateway=1)
+const mostraPip = on => {
+  document.body.classList.toggle('pipOn', on); $('bDash').classList.toggle('on', on);
+  if (on) { if (!ifr.getAttribute('src')) ifr.src = pipSrc; ajustaPip(); }
+};
+demoPip = on => {
+  if (!pipSrc) return;
+  if (on) { pipAntes = document.body.classList.contains('pipOn'); mostraPip(true); } else if (!pipAntes) mostraPip(false);
+};
 // ?gateway=1 no endereço liga a saída para o gateway 101 sozinha (feira: ninguém precisa clicar)
 if (new URLSearchParams(location.search).has('gateway') || NATIVO) $('bBle').click();
 // No app da grua: DASH abre o painel real (/op, servido pelo próprio app) por cima; o simulador segue rodando por baixo.
-if (!NATIVO && canalDash && !new URLSearchParams(location.search).has('gateway')) {     // versao WEB (no quiosque com ?gateway=1 o dash e o do tablet; o sim-gateway nao serve dash.html): o dash (dash.html, a mesma /op do gateway) vem do gateway de mentira acima, por BroadcastChannel
+if (!NATIVO && canalDash && !new URLSearchParams(location.search).has('gateway')) {
+  pipSrc = 'dash.html';     // versao WEB (no quiosque com ?gateway=1 o dash e o do tablet; o sim-gateway nao serve dash.html): o dash (dash.html, a mesma /op do gateway) vem do gateway de mentira acima, por BroadcastChannel
   $('bDash').style.display = ''; $('bDashJan').style.display = '';
-  const pip = $('pip'), ifr = $('dashPip'), tela = $('pipTela'), fr = $('dash');
-  const ajustaPip = () => {            // tamanho da miniatura: ~40% da largura (maximo 440 px; 56% no celular), o dash de 1024x600 escalado por CSS
-    const W = Math.round(Math.min(innerWidth * (innerWidth < 761 ? 0.56 : 0.4), 440)), k = W / 1024;
-    tela.style.width = W + 'px'; tela.style.height = Math.round(600 * k) + 'px';
-    ifr.style.transform = `scale(${k})`;
-    const r = pip.getBoundingClientRect();
-    if (!pip.dataset.moveu) { pip.style.left = Math.max(8, innerWidth - W - (innerWidth < 761 ? 8 : 292)) + 'px'; pip.style.top = (innerWidth < 761 ? 100 : 56) + 'px'; }
-    else { pip.style.left = Math.min(r.left, innerWidth - W - 4) + 'px'; }
-  };
-  const mostraPip = on => {
-    document.body.classList.toggle('pipOn', on); $('bDash').classList.toggle('on', on);
-    if (on) { if (!ifr.getAttribute('src')) ifr.src = 'dash.html'; ajustaPip(); }
-  };
+  const fr = $('dash');
   $('bDash').onclick = () => mostraPip(!document.body.classList.contains('pipOn'));
   $('pipX').onclick = () => mostraPip(false);
   $('pipMax').onclick = () => { mostraPip(false); if (!fr.getAttribute('src')) fr.src = 'dash.html'; document.body.classList.add('noDash'); };   // tela cheia (e a miniatura some)
@@ -1623,7 +1639,9 @@ if (!NATIVO && canalDash && !new URLSearchParams(location.search).has('gateway')
 }
 if (NATIVO) {
   $('bBle').style.display = 'none'; $('bDash').style.display = '';
-  const fr = $('dash');
+  const fr = $('dash'); pipSrc = '/op';
+  $('pipMax').onclick = () => { mostraPip(false); if (!fr.getAttribute('src')) fr.src = '/op'; document.body.classList.add('noDash'); };
+  $('pipX').onclick = () => mostraPip(false);
   $('bDash').onclick = () => { if (!fr.getAttribute('src')) fr.src = '/op'; document.body.classList.add('noDash'); };
   $('bVolta').onclick = () => document.body.classList.remove('noDash');
   // Toque longo (1 s) na etiqueta SIMULAÇÃO: liga/desliga o modo quiosque do tablet (a equipe sabe; o visitante não tenta).
