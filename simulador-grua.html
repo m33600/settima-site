@@ -96,6 +96,10 @@ button.on { background: var(--accent); color: #1A1200; border-color: var(--accen
 #garraCtl button { width: 84px; height: 50px; font: 600 12px/1 system-ui, sans-serif; letter-spacing: .06em; color: var(--ink);
   background: rgba(29,32,24,.8); border: 2px solid var(--line); border-radius: 10px; touch-action: none; cursor: pointer; }
 #garraCtl button.on { background: var(--accent); color: #14160F; border-color: var(--accent); }
+#legenda { position: absolute; top: 70px; left: 50%; transform: translateX(-50%); max-width: min(900px, 52vw); display: none; text-align: center;
+  font-size: 21px; line-height: 1.3; padding: 9px 18px; background: rgba(20,22,15,.84); border: 1px solid var(--accent); border-radius: 8px; pointer-events: none; }
+#legenda.on { display: block; }
+#legenda b { color: var(--accent); letter-spacing: .06em; }
 #teclas { position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; font-size: 14px; color: var(--ink-soft); pointer-events: none; }
 kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px; padding: 2px 8px; color: var(--ink); font-size: 13px; }
 
@@ -259,6 +263,8 @@ kbd { background: var(--bg2); border: 1px solid var(--steel); border-radius: 4px
   <button data-a="fecha">FECHAR</button><button data-a="abre">ABRIR</button>
 </div>
 
+<div id="legenda"></div>
+
 <div id="teclas">
   <kbd>←</kbd> <kbd>→</kbd> giro &nbsp;·&nbsp; <kbd>↑</kbd> <kbd>↓</kbd> braço &nbsp;·&nbsp;
   <kbd>W</kbd> <kbd>S</kbd> (ou <kbd>Q</kbd> <kbd>E</kbd>, <kbd>PgUp</kbd> <kbd>PgDn</kbd>) <b>lança</b> &nbsp;·&nbsp; <kbd>espaço</kbd> demonstração &nbsp;·&nbsp;
@@ -371,22 +377,106 @@ document.querySelectorAll('#garraCtl button').forEach(b => {
   b.addEventListener('pointerup', solta); b.addEventListener('pointercancel', solta);
 });
 
-/* Demonstração: dirige a grua sozinha por poses, passando do limite de propósito */
-const ROTEIRO = [
-  { g: 50, t1: 30, t2: 10 }, { g: -5, t1: 62, t2: 2 }, { g: 120, t1: 25, t2: 45 },       // (espelhado: o giro agora cresce no sentido horario)
-  { g: 150, t1: 55, t2: 3 }, { g: 90, t1: 20, t2: 20 },
-];
-let passo = 0, tPasso = 0;
+/* Demonstração em 3 atos, com legenda e câmera própria: 1) limite de altura (e ensinar um teto mais baixo), 2) limites de giro vistos de
+ * cima, 3) içar peças de sucata de 1.100 e 1.450 kg e ver o peso na garra contra o máximo da tabela (só onde o modelo tem tabela).
+ * Cada passo leva a grua a uma pose (g, t1, t2, garra a, rotator r); o que o limite travar vira "travou" e o passo segue depois de `esp` s.
+ * ini()/fim() rodam ao começar/terminar o passo. Tocar nos controles larga a demonstração (alternaDemo restaura limites e câmera). */
+const CAMS = { lat: { az: 0, el: 3, D: 19, alvo: [0.8, 0, 2.2] }, cima: { az: 0, el: 89, D: 20, alvo: [0.5, 0, 0] }, d3: { az: -38, el: 19, D: 17, alvo: [0.8, 0, 2.2] } };
+let camMeta = null, salvo = null, roteiro = [], passo = 0, tPasso = 0, tEsp = 0, errMelhor = 1e9, tMelhor = 0;
+function legenda(txt) { const el = document.getElementById('legenda'); el.innerHTML = txt; el.classList.toggle('on', !!txt); }
+function setLimite(v) { S.limite = v; S.alarme = false; $('inLim').value = v.toFixed(2); }
+function giroLimites(n, p, q) { S.gNeg = n; S.gPos = p; S.gPre = q; S.gEst = 0; S.gLado = 0; $('gPreSel').value = String(q); giroConfPre(); atualizaGiroUI(); avaliaGiro(); }
+// ponta da lança no mundo (mesma geometria do desenho: joelho com folga KA/KL), e a pose (t1, t2) que põe a ponta num raio da tabela e numa altura
+function pontaDe(g, t1d, t2d) {
+  const [l0, l1, l2] = MODELOS[S.modelo], kn = knAtual(), psi = rad(GIRO_ZERO - g), t1 = rad(t1d), a2 = rad(t1d - t2d);
+  const R = l1 * Math.cos(t1) + kn.KA * Math.sin(t1) - kn.KL * Math.sin(a2) + l2 * Math.cos(a2);
+  return [R * Math.cos(psi), R * Math.sin(psi), l0 + l1 * Math.sin(t1) - kn.KA * Math.cos(t1) + kn.KL * Math.cos(a2) + l2 * Math.sin(a2)];
+}
+function poseDe(raio, z) {
+  const [, l1, l2] = MODELOS[S.modelo], off = (EXTRAS[S.modelo] || {}).raioOff || 0;
+  let melhor = null;
+  for (let t1 = 0; t1 <= 80; t1 += 0.5) for (let t2 = 0; t2 <= 180; t2 += 0.5) {
+    if (folgaChao(t1, t2) < 0.4 || maxH(t1, t2) > S.limite - S.pre - 0.2) continue;       // fora da faixa do pré-aviso: içar não pode bipar
+    const r = l1 * Math.cos(rad(t1)) + l2 * Math.cos(rad(t1 - t2)) + off, e = 4 * (r - raio) ** 2 + (pontaDe(0, t1, t2)[2] - z) ** 2 + 1e-5 * t1;
+    if (!melhor || e < melhor.e) melhor = { e, t1, t2 };
+  }
+  return melhor;
+}
+const PECA_L = 0.62;
+function criaPeca(kg, g, pose) {
+  const p = pontaDe(g, pose.t1, pose.t2);
+  S.peca = { kg, estado: 'chao', x: p[0], y: p[1], ang: rad(GIRO_ZERO - g) - rad(S.rot), l: PECA_L, cor: kg > 1250 ? [128, 62, 44] : [126, 92, 58] };
+}
+function soltaPeca() { if (S.peca) { const p = pontaDe(S.giro, S.t1, S.t2); S.peca.estado = 'chao'; S.peca.x = p[0]; S.peca.y = p[1]; S.peca.ang = rad(GIRO_ZERO - S.giro) - rad(S.rot); } }
+function restauraDemo() {
+  if (salvo) { setLimite(salvo.limite); S.pre = salvo.pre; $('selPre').value = String(salvo.pre); giroLimites(salvo.gNeg, salvo.gPos, salvo.gPre); S.gPre = salvo.gPre; $('gPreSel').value = String(salvo.gPre); salvo = null; }
+  S.peca = null; camMeta = null; legenda('');
+}
+function roteiroDemo() {
+  const R = [], add = o => R.push(o), gm = GIRO_LIM[1], limG = Math.round(gm * 0.67 / 5) * 5, lim = S.limite, pre = S.pre;
+  const teto = Math.round((lim - 1.3) * 20) / 20, B = t => `<b>${t}</b> — `;
+  // ATO 1: altura
+  add({ txt: B('1/3 · LIMITE DE ALTURA') + `teto de ${fmt(lim)} m, pré-aviso a ${fmt(pre)} m`, cam: 'lat', ini: () => { setLimite(lim); giroLimites(null, null, 0); S.peca = null; }, g: 0, t1: 15, t2: 60, a: 1, r: 0, esp: 1 });
+  add({ txt: 'Subindo o braço: perto do limite o bipe avisa (pré-aviso); no limite o alarme trava a subida', t1: 80, esp: 3.5 });
+  add({ txt: 'Descer é livre: o alarme solta', t1: 25, t2: 100, esp: 0.5 });
+  add({ txt: 'A lança também conta: esticando, a ponta chega ao teto e trava', t1: 32, t2: 0, esp: 3.5 });
+  add({ txt: `O operador ensina um teto mais baixo: ${fmt(teto)} m`, ini: () => setLimite(teto), t1: 18, t2: 70, esp: 1 });
+  add({ txt: 'A subida agora trava bem mais cedo', t1: 80, esp: 3 });
+  // ATO 2: giro, vista de cima
+  add({ txt: B('2/3 · LIMITES DE GIRO') + `vista de cima, curso de ±${gm}°`, cam: 'cima', ini: () => { setLimite(lim); if (!mostraTransf) $('bTransf').click(); }, g: 0, t1: 22, t2: 40, esp: 1 });
+  add({ txt: `O operador grava os limites: −${limG}° e +${limG}°, aviso 15° antes`, ini: () => giroLimites(-limG, limG, 15), esp: 2 });
+  add({ txt: `Girando à direita: bipe a +${limG - 15}°, em +${limG}° o giro trava para fora`, g: gm, esp: 3 });
+  add({ txt: `Voltar é livre — vai até o outro limite, −${limG}°`, g: -gm, esp: 3 });
+  add({ txt: `Sem limites gravados, só o batente do curso (±${gm}°) segura o giro`, ini: () => giroLimites(null, null, 0), g: gm, esp: 2 });
+  add({ txt: 'E o mesmo do outro lado', g: -gm, esp: 2 });
+  add({ g: 0, esp: 1 });
+  // ATO 3: peso na garra (só onde há tabela de carga)
+  if (EXTRAS[S.modelo] && EXTRAS[S.modelo].carga) {
+    const baixo = poseDe(4.6, 1.42), alto = poseDe(4.6, 2.7), longe = poseDe(6.95, 3.0), GI = 50;
+    for (const kg of [1100, 1450]) {
+      const pesada = kg > 1250;
+      add({ txt: B('3/3 · PESO NA GARRA') + (pesada ? 'agora uma peça maior, de 1.450 kg' : 'içando uma peça de sucata de 1.100 kg'), cam: 'd3',
+            ini: () => { S.peca = null; criaPeca(kg, -GI, baixo); }, g: -GI, t1: alto.t1, t2: alto.t2, a: 1, r: 0, esp: 0.5 });
+      add({ txt: 'A garra aberta desce sobre a peça', t1: baixo.t1, t2: baixo.t2, esp: 0.8 });
+      add({ txt: 'Fecha a garra: a peça passa a pesar no cabo', a: 0, esp: 0.8, fim: () => { S.peca.estado = 'preso'; } });
+      add({ txt: 'Içando: a leitura sobe com a aceleração', t1: alto.t1, t2: alto.t2, esp: 0.3 });
+      add({ txt: 'Girando com a carga: o peso oscila como um pêndulo', g: GI, r: 90, esp: 0.8 });
+      add({ txt: pesada ? 'Esticando a lança a 7 m: máximo de 1.250 kg — a peça passa, a leitura fica vermelha'
+                        : 'Esticando a lança: o máximo da tabela cai (1.250 kg a 7 m) e a leitura chega perto', t1: longe.t1, t2: longe.t2, esp: 3 });
+      add({ txt: 'Recolhendo a lança: o máximo sobe de novo', t1: alto.t1, t2: alto.t2, esp: 0.3 });
+      add({ txt: 'Descendo a peça no chão', t1: baixo.t1, t2: baixo.t2, esp: 0.5 });
+      add({ txt: 'Abre a garra e deixa a peça', a: 1, ini: soltaPeca, esp: 0.6 });
+      add({ txt: 'Sobe vazia', t1: alto.t1, t2: alto.t2, r: 0, esp: 0.3 });
+    }
+  }
+  add({ txt: 'Fim da demonstração — recomeçando', g: 0, esp: 1.5 });
+  return R;
+}
+function iniciaPasso() {
+  const s = roteiro[passo]; tPasso = 0; tEsp = 0; errMelhor = 1e9; tMelhor = 0;
+  if (s.cam) camMeta = CAMS[s.cam];
+  if (s.txt !== undefined) legenda(s.txt);
+  if (s.ini) s.ini();
+}
 function entradaDemo(dt) {
-  const alvo = ROTEIRO[passo];
-  const dg = alvo.g - S.giro;
-  const sat = (e, tol) => Math.max(-1, Math.min(1, e / tol));
-  const e = { g: sat(dg, 6), b: sat(alvo.t1 - S.t1, 3), l: sat(S.t2 - alvo.t2, 3) };   // lança "sobe" = reduz t2
+  if (!roteiro.length) { S.rot = S.rot % 360; roteiro = roteiroDemo(); passo = 0; iniciaPasso(); }
+  const s = roteiro[passo], sat = (e, tol) => Math.max(-1, Math.min(1, e / tol)), has = v => v !== undefined;
+  const eg = has(s.g) ? s.g - S.giro : 0, eb = has(s.t1) ? s.t1 - S.t1 : 0, el = has(s.t2) ? s.t2 - S.t2 : 0, ea = has(s.a) ? s.a - S.garra : 0, er = has(s.r) ? s.r - S.rot : 0;
   tPasso += dt;
-  const chegou = Math.abs(dg) < 1.5 && Math.abs(alvo.t1 - S.t1) < 1 && Math.abs(S.t2 - alvo.t2) < 1;
-  const travado = tPasso > 2 && (S.blq.b || S.blq.l) && Math.abs(dg) < 1.5;
-  if (chegou || travado || tPasso > 14) { if (travado) log('Demo: movimento travado pelo limite'); passo = (passo + 1) % ROTEIRO.length; tPasso = 0; }
-  return e;
+  const erro = Math.abs(eg) + 2 * Math.abs(eb) + 2 * Math.abs(el) + 30 * Math.abs(ea) + Math.abs(er) / 3;
+  if (erro < errMelhor - 0.3) { errMelhor = erro; tMelhor = tPasso; }
+  const chegou = Math.abs(eg) < 1 && Math.abs(eb) < 0.6 && Math.abs(el) < 0.6 && Math.abs(ea) < 0.03 && Math.abs(er) < 3;
+  const travou = !chegou && tPasso - tMelhor > 1.6;
+  if (chegou || travou || tPasso > 30) {
+    if (tEsp === 0 && travou) log('Demo: movimento travado pelo limite');
+    tEsp += dt;
+    if (tEsp >= (s.esp || 0)) {
+      if (s.fim) s.fim();
+      if (++passo >= roteiro.length) { restauraDemo(); roteiro = []; return { g: 0, b: 0, l: 0, r: 0, a: 0 }; }
+      iniciaPasso();
+    }
+  }
+  return { g: sat(eg, 6), b: sat(eb, 3), l: sat(-el, 3), a: sat(ea, 0.15), r: sat(er, 15) };      // lança "sobe" = reduz t2
 }
 
 function entradas(dt) {
@@ -428,7 +518,7 @@ function entradas(dt) {
   if (demo && manual) alternaDemo();                     // tocou: a demonstração larga o comando
   const r = demo ? entradaDemo(dt) : m;
   const c = v => Math.max(-1, Math.min(1, v));
-  return { g: c(r.g), b: c(r.b), l: c(r.l), r: c(m.r), a: c(m.a) };      // garra e rotator valem tambem na demonstracao
+  return { g: c(r.g), b: c(r.b), l: c(r.l), r: c(demo ? r.r : m.r), a: c(demo ? r.a : m.a) };      // na demonstracao o roteiro tambem comanda garra e rotator
 }
 
 /* ============ Física ============ */
@@ -454,6 +544,11 @@ function t1Minimo(t2) {
 
 function passa(dt) {
   const inp = entradas(dt);
+  if (demo && camMeta) {                       // a câmera da demonstração anda suave até a vista do ato (arrastar com o dedo ainda funciona)
+    const k = Math.min(1, dt * 1.6), da = Math.atan2(Math.sin(rad(camMeta.az) - cam.az), Math.cos(rad(camMeta.az) - cam.az));
+    cam.az += da * k; cam.el += (rad(camMeta.el) - cam.el) * k; cam.D += (camMeta.D - cam.D) * k;
+    for (let i = 0; i < 3; i++) cam.alvo[i] += (camMeta.alvo[i] - cam.alvo[i]) * k;
+  }
   if (S.modelo === 'TITAN6700') {      // garra sucateira: rotator continuo (120 °/s, + = horario visto de cima) e abrir/fechar em ~1,7 s
     S.rot += (inp.r || 0) * 120 * dt;      // (o ESTACIONAR devolve so g, b, l: sem o "|| 0" o rotator e a garra viravam NaN e sumiam)
     S.garra = Math.max(0, Math.min(1, S.garra + (inp.a || 0) * 0.6 * dt));
@@ -534,7 +629,7 @@ function atualizaPeso(dt) {
   const T = ge * Math.cos(dinam.th) - A * Math.sin(dinam.th) + CABO * dinam.thv * dinam.thv;   // tensao do cabo por kg
   const agora = performance.now() / 1000;
   if (agora >= dinam.tremT) { dinam.trem = (Math.random() - 0.5) * 3; dinam.tremT = agora + 0.4; }
-  S.peso = m * T / GRAV;
+  S.peso = (m + (S.peca && S.peca.estado === 'preso' ? S.peca.kg : 0)) * T / GRAV;      // a peça içada pesa no cabo junto com a garra
   S.pesoLido = Math.max(0, Math.round(S.peso + dinam.trem));
 }
 const pesoKg = () => S.peso === null ? null : S.pesoLido;
@@ -1023,6 +1118,11 @@ function constroi() {
       viga(f, lp(0.20, ph, zz(0.64)), lp(Kd[0], ph, zz(Kd[1])), 0.34, 0.05, DENTE);              // dente: do pino ao ventre...
       viga(f, lp(Kd[0], ph, zz(Kd[1])), lp(Td[0], ph, zz(Td[1])), 0.28, 0.05, DENTE);            // ...e do ventre a ponta
     }
+    if (S.peca) {                                      // peça de sucata (demonstração): no chão, ou presa nos dentes (acompanha o rotator)
+      const pc = S.peca, a = pc.estado === 'preso' ? ang : pc.ang, d = [Math.cos(a), Math.sin(a), 0];
+      const c = pc.estado === 'preso' ? [J2[0], J2[1], zz(1.10)] : [pc.x, pc.y, pc.l / 2];
+      viga(f, sub(c, mul(d, pc.l / 2)), add(c, mul(d, pc.l / 2)), pc.l, pc.l, pc.cor);
+    }
   } else {
   // gancho
   const G = [J2[0], J2[1], J2[2] - 1.1];
@@ -1290,11 +1390,11 @@ function desenha() {
 function etiquetaPeso(P2) {
   const pk = pesoKg(); if (pk === null) return '';
   const cm = cargaMaxKg(), kz = Math.min(1, Math.max(0.2, P2[2] / 1.40));          // kz: a garra se comprime perto do chao (ver constroi)
-  const g = proj([P2[0], P2[1], P2[2] - 0.8 * kz]), tara = (EXTRAS[S.modelo] || {}).tara || 0, r = cm === null ? 0 : Math.max(0, pk - tara) / cm;   // a cor usa a carga LIQUIDA: a tabela vale sem garra e rotator
+  const g = proj([P2[0], P2[1], P2[2] - 0.8 * kz]), tara = (EXTRAS[S.modelo] || {}).tara || 0, lq = Math.max(0, pk - tara), r = cm === null ? 0 : lq / cm;   // a cor usa a carga LIQUIDA: a tabela vale sem garra e rotator
   const cor = cm === null ? '#E8EBDF' : r > 1 ? '#FF4A3A' : r >= 0.85 ? '#D9AE58' : '#82BC85';
   const x = (g[0] + 56) | 0, y = g[1] | 0, estilo = 'font-family="monospace" font-weight="700" stroke="#14160F" stroke-width="5" paint-order="stroke"';
   return `<line x1="${(g[0] + 12) | 0}" y1="${y}" x2="${x - 6}" y2="${y}" stroke="${cor}" stroke-width="1.6"/>` +
-         `<text x="${x}" y="${y - 2}" fill="${cor}" font-size="26" ${estilo}>${milhar(pk)} kg</text>` +
+         `<text x="${x}" y="${y - 2}" fill="${cor}" font-size="26" ${estilo}>${milhar(lq)} kg</text>` +
          `<text x="${x}" y="${y + 19}" fill="#E8EBDF" font-size="17" ${estilo}>${cm === null ? 'fora da tabela' : 'máx ' + milhar(cm) + ' kg'}</text>`;
 }
 
@@ -1324,7 +1424,10 @@ function painel() {
   st.style.fontSize = st.textContent.length > 14 ? '17px' : '';          // textos longos (limite de giro) cabem numa linha so
   const pk = pesoKg(), cm = cargaMaxKg();
   $('linPeso').style.display = pk === null ? 'none' : '';
-  if (pk !== null) $('vPeso').textContent = cm === null ? milhar(pk) + ' kg / fora da tabela' : milhar(pk) + ' / ' + milhar(cm) + ' kg · ' + Math.round(pk / cm * 100) + '%';
+  if (pk !== null) {                                       // carga LIQUIDA (sem garra e rotator), como o dash: a tabela do fabricante vale sem os dois
+    const lq = Math.max(0, pk - ((EXTRAS[S.modelo] || {}).tara || 0));
+    $('vPeso').textContent = cm === null ? milhar(lq) + ' kg / fora da tabela' : milhar(lq) + ' / ' + milhar(cm) + ' kg · ' + Math.round(lq / cm * 100) + '%';
+  }
   for (const [id, e] of [['eG', 'g'], ['eB', 'b'], ['eL', 'l']]) {
     const el = $(id), nome = { g: 'GIRO', b: 'BRAÇO', l: 'LANÇA' }[e];
     el.className = 'eixo' + (S.blq[e] ? ' blq' : S.movendo && S.movendo[e] ? ' mov' : '');
@@ -1334,7 +1437,8 @@ function painel() {
 
 /* ============ Controles da interface ============ */
 function alternaDemo() {
-  demo = !demo; passo = 0; tPasso = 0;
+  demo = !demo; roteiro = []; passo = 0; tPasso = 0;
+  if (demo) salvo = { limite: S.limite, pre: S.pre, gNeg: S.gNeg, gPos: S.gPos, gPre: S.gPre }; else restauraDemo();
   $('bDemo').classList.toggle('on', demo);
   $('bDemo').textContent = demo ? '■ Parar demonstração' : '▶ Demonstração';
   log(demo ? 'Demonstração ligada' : 'Demonstração parada');
