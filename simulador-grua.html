@@ -378,7 +378,7 @@ document.querySelectorAll('#garraCtl button').forEach(b => {
 });
 
 /* Demonstração em 3 atos, com legenda e câmera própria: 1) limite de altura (e ensinar um teto mais baixo), 2) limites de giro vistos de
- * cima, 3) içar peças de sucata de 1.100 e 1.450 kg e ver o peso na garra contra o máximo da tabela (só onde o modelo tem tabela).
+ * cima, 3) içar peças de sucata de 850 e 1.100 kg e ver o peso líquido na garra contra o máximo líquido (tabela - tara) (só onde o modelo tem tabela).
  * Cada passo leva a grua a uma pose (g, t1, t2, garra a, rotator r); o que o limite travar vira "travou" e o passo segue depois de `esp` s.
  * ini()/fim() rodam ao começar/terminar o passo. Tocar nos controles larga a demonstração (alternaDemo restaura limites e câmera). */
 // seg = graus de afastamento da direção do braço: a câmera SEGUE o giro (az = 180° − giro + seg), então a lança nunca fica de costas.
@@ -407,7 +407,7 @@ function poseDe(raio, z) {
 const PECA_L = 0.62;
 function criaPeca(kg, g, pose) {
   const p = pontaDe(g, pose.t1, pose.t2);
-  S.peca = { kg, estado: 'chao', x: p[0], y: p[1], ang: rad(GIRO_ZERO - g) - rad(S.rot), l: PECA_L, cor: kg > 1250 ? [128, 62, 44] : [126, 92, 58] };
+  S.peca = { kg, estado: 'chao', x: p[0], y: p[1], ang: rad(GIRO_ZERO - g) - rad(S.rot), l: PECA_L, cor: kg > 1000 ? [128, 62, 44] : [126, 92, 58] };
 }
 function soltaPeca() { if (S.peca) { const p = pontaDe(S.giro, S.t1, S.t2); S.peca.estado = 'chao'; S.peca.x = p[0]; S.peca.y = p[1]; S.peca.ang = rad(GIRO_ZERO - S.giro) - rad(S.rot); } }
 function restauraDemo() {
@@ -435,17 +435,17 @@ function roteiroDemo() {
   // ATO 3: peso na garra (só onde há tabela de carga)
   if (EXTRAS[S.modelo] && EXTRAS[S.modelo].carga) {
     const baixo = poseDe(4.6, 1.42), alto = poseDe(4.6, 2.7), longe = poseDe(6.95, 3.0), GI = 50;
-    for (const kg of [1100, 1450]) {
-      const pesada = kg > 1250;
-      add({ txt: B('3/3 · PESO NA GARRA') + (pesada ? 'agora uma peça maior, de 1.450 kg' : 'içando uma peça de sucata de 1.100 kg'), cam: 'd3',
+    for (const kg of [850, 1100]) {
+      const pesada = kg > 1000;
+      add({ txt: B('3/3 · PESO NA GARRA') + (pesada ? 'agora uma peça maior, de 1.100 kg' : 'içando uma peça de sucata de 850 kg'), cam: 'd3',
             ini: () => { S.peca = null; criaPeca(kg, -GI, baixo); }, g: -GI, t1: alto.t1, t2: alto.t2, a: 1, r: 0, esp: 0.5 });
       add({ txt: 'A garra aberta desce sobre a peça', t1: baixo.t1, t2: baixo.t2, esp: 0.8 });
       add({ txt: 'Fecha a garra: a peça passa a pesar no cabo', a: 0, esp: 0.8, fim: () => { S.peca.estado = 'preso'; } });
       add({ txt: 'Içando: a leitura sobe com a aceleração', t1: alto.t1, t2: alto.t2, esp: 0.3 });
       add({ txt: 'Girando com a carga: o peso oscila como um pêndulo', g: GI, r: 90, esp: 0.8 });
-      add({ txt: pesada ? 'Esticando a lança a 7 m: máximo de 1.250 kg — a peça passa, a leitura fica vermelha'
-                        : 'Esticando a lança: o máximo da tabela cai (1.250 kg a 7 m) e a leitura chega perto', t1: longe.t1, t2: longe.t2, esp: 3 });
-      add({ txt: 'Recolhendo a lança: o máximo sobe de novo', t1: alto.t1, t2: alto.t2, esp: 0.3 });
+      add({ txt: pesada ? 'Esticando a lança a 7 m: a marca de máximo desce abaixo da peça — a leitura fica vermelha'
+                        : 'Esticando a lança: a marca de máximo desce e a leitura chega perto dela', t1: longe.t1, t2: longe.t2, esp: 3 });
+      add({ txt: 'Recolhendo a lança: a marca de máximo sobe de novo', t1: alto.t1, t2: alto.t2, esp: 0.3 });
       add({ txt: 'Descendo a peça no chão', t1: baixo.t1, t2: baixo.t2, esp: 0.5 });
       add({ txt: 'Abre a garra e deixa a peça', a: 1, ini: soltaPeca, esp: 0.6 });
       add({ txt: 'Sobe vazia', t1: alto.t1, t2: alto.t2, r: 0, esp: 0.3 });
@@ -719,7 +719,7 @@ function jsonAllDash() {
     t1: +S.t1.toFixed(2), t2: +S.t2.toFixed(2), hMax: +hMax.toFixed(2), lim: S.limite, pav: +(S.limite - S.pre).toFixed(2),
     aviso: (!alarme && (S.pregao || S.gEst === 1)) ? 1 : 0, geo: 1, cal: 1, calb: 1, call: 1,
     hop: +(dashHor.op + dashHor.opS / 3600).toFixed(3), hup: +(dashHor.up + seg / 3600).toFixed(3), gl: GIRO_LIM[1],
-    ra: +ra.toFixed(2), cm: cm === null ? null : Math.round(cm), tr: ex.tara || 0,
+    ra: +ra.toFixed(2), cm: cm === null ? null : Math.round(cm), cx: (ex.carga && ex.carga[0][1]) || 0, tr: ex.tara || 0,
     gn: S.gNeg, gp: S.gPos, gq: S.gPre, ge: S.gEst, gd: S.gLado,
   };
 }
@@ -1392,12 +1392,12 @@ function desenha() {
 function etiquetaPeso(P2) {
   const pk = pesoKg(); if (pk === null) return '';
   const cm = cargaMaxKg(), kz = Math.min(1, Math.max(0.2, P2[2] / 1.40));          // kz: a garra se comprime perto do chao (ver constroi)
-  const g = proj([P2[0], P2[1], P2[2] - 0.8 * kz]), tara = (EXTRAS[S.modelo] || {}).tara || 0, lq = Math.max(0, pk - tara), r = cm === null ? 0 : lq / cm;   // a cor usa a carga LIQUIDA: a tabela vale sem garra e rotator
+  const g = proj([P2[0], P2[1], P2[2] - 0.8 * kz]), tara = (EXTRAS[S.modelo] || {}).tara || 0, lq = Math.max(0, pk - tara), mliq = cm === null ? 0 : Math.max(0, cm - tara), r = cm === null ? 0 : (mliq > 0 ? lq / mliq : (lq > 0 ? 9 : 0));   // a cor usa a carga LIQUIDA: a tabela vale sem garra e rotator
   const cor = cm === null ? '#E8EBDF' : r > 1 ? '#FF4A3A' : r >= 0.85 ? '#D9AE58' : '#82BC85';
   const x = (g[0] + 56) | 0, y = g[1] | 0, estilo = 'font-family="monospace" font-weight="700" stroke="#14160F" stroke-width="5" paint-order="stroke"';
   return `<line x1="${(g[0] + 12) | 0}" y1="${y}" x2="${x - 6}" y2="${y}" stroke="${cor}" stroke-width="1.6"/>` +
          `<text x="${x}" y="${y - 2}" fill="${cor}" font-size="26" ${estilo}>${milhar(lq)} kg</text>` +
-         `<text x="${x}" y="${y + 19}" fill="#E8EBDF" font-size="17" ${estilo}>${cm === null ? 'fora da tabela' : 'máx ' + milhar(cm) + ' kg'}</text>`;
+         `<text x="${x}" y="${y + 19}" fill="#E8EBDF" font-size="17" ${estilo}>${cm === null ? 'fora da tabela' : 'máx ' + milhar(mliq) + ' kg'}</text>`;
 }
 
 /* ============ Painel ============ */
@@ -1428,7 +1428,8 @@ function painel() {
   $('linPeso').style.display = pk === null ? 'none' : '';
   if (pk !== null) {                                       // carga LIQUIDA (sem garra e rotator), como o dash: a tabela do fabricante vale sem os dois
     const lq = Math.max(0, pk - ((EXTRAS[S.modelo] || {}).tara || 0));
-    $('vPeso').textContent = cm === null ? milhar(lq) + ' kg / fora da tabela' : milhar(lq) + ' / ' + milhar(cm) + ' kg · ' + Math.round(lq / cm * 100) + '%';
+    const ml = cm === null ? 0 : Math.max(0, cm - ((EXTRAS[S.modelo] || {}).tara || 0));      // maximo LIQUIDO = tabela - tara (a conta do dash)
+    $('vPeso').textContent = cm === null ? milhar(lq) + ' kg / fora da tabela' : milhar(lq) + ' / ' + milhar(ml) + ' kg · ' + (ml > 0 ? Math.round(lq / ml * 100) : 999) + '%';
   }
   for (const [id, e] of [['eG', 'g'], ['eB', 'b'], ['eL', 'l']]) {
     const el = $(id), nome = { g: 'GIRO', b: 'BRAÇO', l: 'LANÇA' }[e];
@@ -1610,7 +1611,7 @@ const mostraPip = on => {
   if (on) { if (!ifr.getAttribute('src')) ifr.src = pipSrc; ajustaPip(); }
 };
 demoPip = on => {
-  if (!pipSrc) return;
+  if (!pipSrc || PONTE === location.origin) return;        // servida pelo sim-gateway: ele redireciona /dash.html para a própria página (a miniatura seria o simulador dentro dele)
   if (on) { pipAntes = document.body.classList.contains('pipOn'); mostraPip(true); } else if (!pipAntes) mostraPip(false);
 };
 // ?gateway=1 no endereço liga a saída para o gateway 101 sozinha (feira: ninguém precisa clicar)
